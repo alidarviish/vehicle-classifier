@@ -57,6 +57,8 @@ lightning_logs/
 *.h5
 *.pkl
 *.joblib
+# per-epoch training histories written by src/train.py (reports/<run_name>_history.csv)
+reports/*_history.csv
 
 # ---- Python, notebooks, caches ----
 __pycache__/
