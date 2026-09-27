@@ -49,6 +49,41 @@ BASE_TRANSFORM = transforms.Compose([
     transforms.Normalize(mean=NORM_MEAN, std=NORM_STD),
 ])
 
+# experiment A: train-only augmentation (random crop + brightness/contrast jitter).
+# RandomResizedCrop already outputs IMAGE_SIZE x IMAGE_SIZE, so no Resize is needed.
+CROP_SCALE = (0.8, 1.0)
+BRIGHTNESS = 0.2
+CONTRAST = 0.2
+CROP_JITTER_TRANSFORM = transforms.Compose([
+    transforms.RandomResizedCrop(IMAGE_SIZE, scale=CROP_SCALE),
+    transforms.ColorJitter(brightness=BRIGHTNESS, contrast=CONTRAST),
+    transforms.ToTensor(),
+    transforms.Normalize(mean=NORM_MEAN, std=NORM_STD),
+])
+
+# experiment B: crop_jitter plus horizontal flip and a small rotation (same values as above)
+ROTATION_DEGREES = 10
+FULL_AUG_TRANSFORM = transforms.Compose([
+    transforms.RandomResizedCrop(IMAGE_SIZE, scale=CROP_SCALE),
+    transforms.RandomHorizontalFlip(),
+    transforms.RandomRotation(ROTATION_DEGREES),
+    transforms.ColorJitter(brightness=BRIGHTNESS, contrast=CONTRAST),
+    transforms.ToTensor(),
+    transforms.Normalize(mean=NORM_MEAN, std=NORM_STD),
+])
+
+# train transform per --augmentation value; validation always uses BASE_TRANSFORM
+TRAIN_TRANSFORMS = {"none": BASE_TRANSFORM, "crop_jitter": CROP_JITTER_TRANSFORM,
+                    "full_aug": FULL_AUG_TRANSFORM}
+AUGMENTATION_PARAMS = {
+    "none": None,
+    "crop_jitter": {"random_resized_crop_scale": list(CROP_SCALE),
+                    "brightness": BRIGHTNESS, "contrast": CONTRAST},
+    "full_aug": {"random_resized_crop_scale": list(CROP_SCALE), "horizontal_flip_p": 0.5,
+                 "rotation_degrees": ROTATION_DEGREES,
+                 "brightness": BRIGHTNESS, "contrast": CONTRAST},
+}
+
 DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 
@@ -61,9 +96,9 @@ def set_seed(seed=SEED):
         torch.cuda.manual_seed_all(seed)
 
 
-def build_loaders(manifest_path, config_path):
-    train_set = VehicleDataset("train", BASE_TRANSFORM, manifest_path, config_path)
-    val_set = VehicleDataset("val", BASE_TRANSFORM, manifest_path, config_path)
+def build_loaders(manifest_path, config_path, train_transform=BASE_TRANSFORM):
+    train_set = VehicleDataset("train", train_transform, manifest_path, config_path)
+    val_set = VehicleDataset("val", BASE_TRANSFORM, manifest_path, config_path)  # never augmented
     train_loader = DataLoader(train_set, batch_size=BATCH_SIZE, shuffle=True)
     val_loader = DataLoader(val_set, batch_size=BATCH_SIZE, shuffle=False)
     return train_loader, val_loader
@@ -113,13 +148,14 @@ def save_history(history, path):
         writer.writerows(history)
 
 
-def train(run_name, manifest_path, config_path, epochs=EPOCHS):
+def train(run_name, manifest_path, config_path, epochs=EPOCHS, augmentation="none"):
     set_seed()
     REPORTS_DIR.mkdir(exist_ok=True)
     CHECKPOINT_DIR.mkdir(exist_ok=True)
 
-    train_loader, val_loader = build_loaders(manifest_path, config_path)
-    print(f"device {DEVICE} | train {len(train_loader.dataset)} | val {len(val_loader.dataset)}")
+    train_loader, val_loader = build_loaders(manifest_path, config_path, TRAIN_TRANSFORMS[augmentation])
+    print(f"device {DEVICE} | train {len(train_loader.dataset)} | val {len(val_loader.dataset)} "
+          f"| augmentation {augmentation}")
 
     model = BaselineCNN(num_classes=len(CLASSES), image_size=IMAGE_SIZE, dropout=DROPOUT).to(DEVICE)
     criterion = nn.CrossEntropyLoss()
@@ -150,7 +186,8 @@ def train(run_name, manifest_path, config_path, epochs=EPOCHS):
                 "architecture": "BaselineCNN",
                 "image_size": IMAGE_SIZE,
                 "transform": {"resize": [IMAGE_SIZE, IMAGE_SIZE], "normalize_mean": NORM_MEAN,
-                              "normalize_std": NORM_STD, "augmentation": "none"},
+                              "normalize_std": NORM_STD, "augmentation": augmentation,
+                              "augmentation_params": AUGMENTATION_PARAMS[augmentation]},
                 "seed": SEED,
                 "dropout": DROPOUT,
                 "pooling": "max",
@@ -177,8 +214,10 @@ def main():
     parser.add_argument("--manifest", default=DEFAULT_MANIFEST, help="split manifest CSV")
     parser.add_argument("--run-name", default="baseline")
     parser.add_argument("--epochs", type=int, default=EPOCHS)
+    parser.add_argument("--augmentation", choices=list(TRAIN_TRANSFORMS), default="none",
+                        help="train-only augmentation (validation is never augmented)")
     args = parser.parse_args()
-    train(args.run_name, args.manifest, args.config, args.epochs)
+    train(args.run_name, args.manifest, args.config, args.epochs, args.augmentation)
 
 
 if __name__ == "__main__":

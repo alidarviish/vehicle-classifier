@@ -1,0 +1,11 @@
+review_id,image_path,original_label,decision,final_label,reviewer,date,note
+KK01,v1/train/kamyun/218936367.jpg,kamyun,KEEP_KAMYUN,kamyun,human,2026-09-27,manual visual review
+KK02,v1/unclean/kamyun/205437377.jpg,kamyun,RELABEL_KAMYUNET,kamyunet,human,2026-09-27,manual visual review
+KK03,v1/unclean/kamyun/217998174.jpg,kamyun,RELABEL_KAMYUNET,kamyunet,human,2026-09-27,manual visual review
+KK04,v2/train/kamyun/216561920.jpg,kamyun,KEEP_KAMYUN,kamyun,human,2026-09-27,manual visual review
+KK05,v2/train/kamyun/218231967.jpg,kamyun,RELABEL_KAMYUNET,kamyunet,human,2026-09-27,manual visual review
+KK06,v2/train/kamyun/218827750.jpg,kamyun,KEEP_KAMYUN,kamyun,human,2026-09-27,manual visual review
+KK07,v2/train/kamyun/219057756.jpg,kamyun,RELABEL_KAMYUNET,kamyunet,human,2026-09-27,manual visual review
+KK08,v2/unclean/kamyun/213234314.jpg,kamyun,RELABEL_KAMYUNET,kamyunet,human,2026-09-27,manual visual review
+KK09,v2/unclean/kamyun/216456908.jpg,kamyun,RELABEL_KAMYUNET,kamyunet,human,2026-09-27,manual visual review
+KK10,v2/unclean/kamyun/218307800.jpg,kamyun,RELABEL_KAMYUNET,kamyunet,human,2026-09-27,manual visual review

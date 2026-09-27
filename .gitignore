@@ -59,6 +59,8 @@ lightning_logs/
 *.joblib
 # per-epoch training histories written by src/train.py (reports/<run_name>_history.csv)
 reports/*_history.csv
+# generated analysis outputs (plots, tables, text) written by scripts/analyze_baseline.py
+reports/analysis/
 
 # ---- Python, notebooks, caches ----
 __pycache__/

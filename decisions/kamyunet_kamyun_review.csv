@@ -1,0 +1,16 @@
+review_id,image_path,original_label,decision,final_label,reviewer,date,note
+KN01,v1/unclean/kamyunet/217930620.jpg,kamyunet,KEEP_KAMYUNET,kamyunet,human,2026-09-27,manual visual review
+KN02,v2/train/kamyunet/194277690.jpg,kamyunet,KEEP_KAMYUNET,kamyunet,human,2026-09-27,manual visual review
+KN03,v2/train/kamyunet/209546498.jpg,kamyunet,KEEP_KAMYUNET,kamyunet,human,2026-09-27,manual visual review
+KN04,v2/train/kamyunet/212046691.jpg,kamyunet,UNCERTAIN,kamyunet,human,2026-09-27,manual visual review
+KN05,v2/train/kamyunet/215618855.jpg,kamyunet,KEEP_KAMYUNET,kamyunet,human,2026-09-27,manual visual review
+KN06,v2/train/kamyunet/215916570.jpg,kamyunet,KEEP_KAMYUNET,kamyunet,human,2026-09-27,manual visual review
+KN07,v2/train/kamyunet/215961412.jpg,kamyunet,KEEP_KAMYUNET,kamyunet,human,2026-09-27,manual visual review
+KN08,v2/train/kamyunet/216447524.jpg,kamyunet,KEEP_KAMYUNET,kamyunet,human,2026-09-27,manual visual review
+KN09,v2/train/kamyunet/218587067.jpg,kamyunet,KEEP_KAMYUNET,kamyunet,human,2026-09-27,manual visual review
+KN10,v2/train/kamyunet/219017445.jpg,kamyunet,RELABEL_KAMYUN,kamyun,human,2026-09-27,manual visual review
+KN11,v2/unclean/kamyunet/199184462.jpg,kamyunet,KEEP_KAMYUNET,kamyunet,human,2026-09-27,manual visual review
+KN12,v2/unclean/kamyunet/207502063.jpg,kamyunet,KEEP_KAMYUNET,kamyunet,human,2026-09-27,manual visual review
+KN13,v2/unclean/kamyunet/210034335.jpg,kamyunet,KEEP_KAMYUNET,kamyunet,human,2026-09-27,manual visual review
+KN14,v2/unclean/kamyunet/218729757.jpg,kamyunet,KEEP_KAMYUNET,kamyunet,human,2026-09-27,manual visual review
+KN15,v2/unclean/kamyunet/218804409.jpg,kamyunet,KEEP_KAMYUNET,kamyunet,human,2026-09-27,manual visual review
