@@ -45,7 +45,8 @@ def predict_val(config_path):
     if checkpoint["class_to_idx"] != CLASS_TO_IDX:
         raise ValueError(f"class mapping in checkpoint differs: {checkpoint['class_to_idx']}")
     model = BaselineCNN(num_classes=len(CLASSES), image_size=checkpoint["image_size"],
-                        dropout=checkpoint["dropout"])
+                        dropout=checkpoint["dropout"],
+                        pooling=checkpoint.get("pooling", "max"))  # older checkpoints: max
     model.load_state_dict(checkpoint["model_state"])
     model.eval()
 

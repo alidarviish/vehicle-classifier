@@ -140,7 +140,8 @@ def evaluate_checkpoint(checkpoint_path, config_path):
         raise ValueError(f"unexpected architecture: {checkpoint['architecture']}")
 
     model = BaselineCNN(num_classes=len(CLASSES), image_size=checkpoint["image_size"],
-                        dropout=checkpoint["dropout"])
+                        dropout=checkpoint["dropout"],
+                        pooling=checkpoint.get("pooling", "max"))  # older checkpoints: max
     model.load_state_dict(checkpoint["model_state"])
     model.eval()
 
