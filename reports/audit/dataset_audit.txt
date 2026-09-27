@@ -1,0 +1,145 @@
+Dataset audit (read only, from data/manifest.csv)
+images in manifest: 4360
+
+Images per source
+  v1                                         1250
+  v2                                         3110
+  TOTAL                                      4360
+
+Images per source / origin_split
+  v1 / test                                   400
+  v1 / train                                  400
+  v1 / unclean                                450
+  v2 / train                                 1532
+  v2 / unclean                               1578
+  TOTAL                                      4360
+
+Images per source / origin_split / folder_label
+  v1 / test / ambulance                        50
+  v1 / test / autobus                          50
+  v1 / test / kamyun                           50
+  v1 / test / kamyunet                         50
+  v1 / test / minibus                          50
+  v1 / test / savari                           50
+  v1 / test / taxi                             50
+  v1 / test / vanet                            50
+  v1 / train / ambulance                       50
+  v1 / train / autobus                         50
+  v1 / train / kamyun                          50
+  v1 / train / kamyunet                        50
+  v1 / train / minibus                         50
+  v1 / train / savari                          50
+  v1 / train / taxi                            50
+  v1 / train / vanet                           50
+  v1 / unclean / ambulance                     50
+  v1 / unclean / autobus                       50
+  v1 / unclean / kamyun                        50
+  v1 / unclean / kamyunet                      50
+  v1 / unclean / minibus                       50
+  v1 / unclean / neysan                        50
+  v1 / unclean / savari                        50
+  v1 / unclean / taxi                          50
+  v1 / unclean / vanet                         50
+  v2 / train / ambulance                      169
+  v2 / train / autobus                        195
+  v2 / train / kamyun                         200
+  v2 / train / kamyunet                       188
+  v2 / train / minibus                        180
+  v2 / train / savari                         200
+  v2 / train / taxi                           200
+  v2 / train / vanet                          200
+  v2 / unclean / ambulance                    107
+  v2 / unclean / autobus                      176
+  v2 / unclean / kamyun                       196
+  v2 / unclean / kamyunet                     171
+  v2 / unclean / minibus                      135
+  v2 / unclean / neysan                       200
+  v2 / unclean / savari                       200
+  v2 / unclean / taxi                         193
+  v2 / unclean / vanet                        200
+  TOTAL                                      4360
+
+Exact duplicate groups (same sha256): 24
+files involved: 48
+
+DUP001  test <-> unclean (v1)  labels=ambulance
+    v1/test/ambulance/218089422.jpg
+    v1/unclean/ambulance/218089422.jpg
+DUP002  train <-> unclean (v1)  labels=ambulance
+    v1/train/ambulance/213801906.jpg
+    v1/unclean/ambulance/213801906.jpg
+DUP003  train <-> unclean (v1)  labels=ambulance
+    v1/train/ambulance/213342200.jpg
+    v1/unclean/ambulance/213342200.jpg
+DUP004  train <-> unclean (v1)  labels=autobus
+    v1/train/autobus/218337345.jpg
+    v1/unclean/autobus/218337345.jpg
+DUP005  train <-> unclean (v1)  labels=ambulance
+    v1/train/ambulance/206808986.jpg
+    v1/unclean/ambulance/206808986.jpg
+DUP006  train <-> unclean (v1)  labels=kamyunet
+    v1/train/kamyunet/195578789.jpg
+    v1/unclean/kamyunet/195578789.jpg
+DUP007  test <-> unclean (v1)  labels=minibus
+    v1/test/minibus/218307381.jpg
+    v1/unclean/minibus/218307381.jpg
+DUP008  train <-> unclean (v1)  labels=ambulance
+    v1/train/ambulance/208738861.jpg
+    v1/unclean/ambulance/208738861.jpg
+DUP009  train <-> unclean (v1)  labels=ambulance
+    v1/train/ambulance/218966979.jpg
+    v1/unclean/ambulance/218966979.jpg
+DUP010  train <-> unclean (v1)  labels=minibus
+    v1/train/minibus/205737488.jpg
+    v1/unclean/minibus/205737488.jpg
+DUP011  train <-> unclean (v1)  labels=ambulance
+    v1/train/ambulance/218591595.jpg
+    v1/unclean/ambulance/218591595.jpg
+DUP012  train <-> unclean (v1)  labels=kamyunet
+    v1/train/kamyunet/217156552.jpg
+    v1/unclean/kamyunet/217156552.jpg
+DUP013  test <-> unclean (v1)  labels=minibus
+    v1/test/minibus/218138154.jpg
+    v1/unclean/minibus/218138154.jpg
+DUP014  train <-> unclean (v1)  labels=neysan,vanet  LABEL CONFLICT
+    v1/train/vanet/214844236.jpg
+    v1/unclean/neysan/214844236.jpg
+DUP015  test <-> unclean (v1)  labels=ambulance
+    v1/test/ambulance/214830125.jpg
+    v1/unclean/ambulance/214830125.jpg
+DUP016  train <-> unclean (v1)  labels=kamyunet
+    v1/train/kamyunet/193903806.jpg
+    v1/unclean/kamyunet/193903806.jpg
+DUP017  train <-> unclean (v1)  labels=ambulance
+    v1/train/ambulance/216216403.jpg
+    v1/unclean/ambulance/216216403.jpg
+DUP018  test <-> unclean (v1)  labels=ambulance
+    v1/test/ambulance/200396165.jpg
+    v1/unclean/ambulance/200396165.jpg
+DUP019  test <-> unclean (v1)  labels=ambulance
+    v1/test/ambulance/216095686.jpg
+    v1/unclean/ambulance/216095686.jpg
+DUP020  train <-> unclean (v1)  labels=ambulance
+    v1/train/ambulance/199984667.jpg
+    v1/unclean/ambulance/199984667.jpg
+DUP021  test <-> unclean (v1)  labels=ambulance
+    v1/test/ambulance/217040489.jpg
+    v1/unclean/ambulance/217040489.jpg
+DUP022  train <-> unclean (v1)  labels=minibus
+    v1/train/minibus/198331521.jpg
+    v1/unclean/minibus/198331521.jpg
+DUP023  train <-> unclean (v1)  labels=kamyunet
+    v1/train/kamyunet/194270924.jpg
+    v1/unclean/kamyunet/194270924.jpg
+DUP024  test <-> unclean (v1)  labels=ambulance
+    v1/test/ambulance/215713763.jpg
+    v1/unclean/ambulance/215713763.jpg
+
+Duplicate groups per relation
+  test <-> unclean (v1)                         8
+  train <-> unclean (v1)                       16
+
+Exact duplicate label conflicts (same sha256, different folder_label): 1
+  DUP014  sha256=90916da4f0a7a65ea4c298d2a309b66d426e4a70867c5f3a5258f180c6b7f382
+    v1/train/vanet/214844236.jpg  (folder_label=vanet)
+    v1/unclean/neysan/214844236.jpg  (folder_label=neysan)

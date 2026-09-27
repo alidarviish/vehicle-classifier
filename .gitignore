@@ -1,0 +1,86 @@
+# ---- Private data: never commit ----
+data/*
+!data/.gitkeep
+dataset/
+datasetv2_TrainUclean/
+**/dataset/
+**/datasetv2_TrainUclean/
+raw/
+review_package/
+contact_sheets/
+*contact_sheet*
+*contactsheet*
+# ...but the script that builds contact sheets is code and must be tracked
+!scripts/make_contact_sheets.py
+
+# Images (any case)
+*.jpg
+*.JPG
+*.jpeg
+*.JPEG
+*.png
+*.PNG
+*.webp
+*.WEBP
+*.bmp
+*.BMP
+*.gif
+*.GIF
+*.tif
+*.tiff
+*.TIF
+*.TIFF
+*.heic
+*.HEIC
+
+# Archives that may contain data
+*.zip
+*.tar
+*.tar.gz
+*.tgz
+*.7z
+*.rar
+
+# ---- Models and run outputs ----
+checkpoints/
+models/
+runs/
+outputs/
+wandb/
+mlruns/
+lightning_logs/
+*.pt
+*.pth
+*.ckpt
+*.onnx
+*.safetensors
+*.h5
+*.pkl
+*.joblib
+
+# ---- Python, notebooks, caches ----
+__pycache__/
+*.py[cod]
+.ipynb_checkpoints/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.cache/
+*.log
+tmp/
+temp/
+
+# ---- Environments, secrets, local machine paths ----
+configs/local_paths.json
+.venv/
+venv/
+env/
+.env
+.env.*
+
+# ---- OS / editor ----
+.DS_Store
+Thumbs.db
+desktop.ini
+.vscode/
+.idea/

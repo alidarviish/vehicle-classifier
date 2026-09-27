@@ -1,0 +1,6 @@
+{
+  "sources": {
+    "v1": "PATH/TO/dataset",
+    "v2": "PATH/TO/datasetv2_TrainUclean"
+  }
+}
