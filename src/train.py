@@ -40,6 +40,12 @@ LEARNING_RATE = 1e-3
 WEIGHT_DECAY = 0.0
 OPTIMIZERS = {"adam": torch.optim.Adam, "adamw": torch.optim.AdamW}
 DROPOUT = 0.0
+# learning-rate schedulers (fixed settings); "none" keeps the learning rate constant (baseline)
+SCHEDULER_PARAMS = {
+    "none": None,
+    "step": {"step_size": 8, "gamma": 0.5},
+    "plateau": {"mode": "min", "factor": 0.5, "patience": 3},
+}
 NORM_MEAN = [0.5, 0.5, 0.5]
 NORM_STD = [0.5, 0.5, 0.5]
 
@@ -150,7 +156,7 @@ def save_history(history, path):
 
 
 def train(run_name, manifest_path, config_path, epochs=EPOCHS, augmentation="none", dropout=DROPOUT,
-          pooling="max", optimizer_name="adam", weight_decay=WEIGHT_DECAY):
+          pooling="max", optimizer_name="adam", weight_decay=WEIGHT_DECAY, scheduler_name="none"):
     set_seed()
     REPORTS_DIR.mkdir(exist_ok=True)
     CHECKPOINT_DIR.mkdir(exist_ok=True)
@@ -158,12 +164,17 @@ def train(run_name, manifest_path, config_path, epochs=EPOCHS, augmentation="non
     train_loader, val_loader = build_loaders(manifest_path, config_path, TRAIN_TRANSFORMS[augmentation])
     print(f"device {DEVICE} | train {len(train_loader.dataset)} | val {len(val_loader.dataset)} "
           f"| augmentation {augmentation} | dropout {dropout} | pooling {pooling} "
-          f"| optimizer {optimizer_name} | weight_decay {weight_decay}")
+          f"| optimizer {optimizer_name} | weight_decay {weight_decay} | scheduler {scheduler_name}")
 
     model = BaselineCNN(num_classes=len(CLASSES), image_size=IMAGE_SIZE, dropout=dropout,
                         pooling=pooling).to(DEVICE)
     criterion = nn.CrossEntropyLoss()
     optimizer = OPTIMIZERS[optimizer_name](model.parameters(), lr=LEARNING_RATE, weight_decay=weight_decay)
+    scheduler = None
+    if scheduler_name == "step":
+        scheduler = torch.optim.lr_scheduler.StepLR(optimizer, **SCHEDULER_PARAMS["step"])
+    elif scheduler_name == "plateau":
+        scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, **SCHEDULER_PARAMS["plateau"])
 
     history = []
     best_f1 = -1.0
@@ -198,13 +209,20 @@ def train(run_name, manifest_path, config_path, epochs=EPOCHS, augmentation="non
                 "optimizer": optimizer_name,
                 "learning_rate": LEARNING_RATE,
                 "batch_size": BATCH_SIZE,
-                "scheduler": "none",
+                "scheduler": scheduler_name,
+                "scheduler_params": SCHEDULER_PARAMS[scheduler_name],
                 "weight_decay": weight_decay,
                 "loss_name": "ce",
                 "epoch": epoch,
                 "val_f1": best_f1,
             }, checkpoint_path)
             print(f"  -> saved {checkpoint_path.name} (val_f1 {best_f1:.4f})")
+
+        # scheduler steps after the epoch is logged, so the "lr" column is the rate used in this epoch
+        if scheduler_name == "step":
+            scheduler.step()
+        elif scheduler_name == "plateau":
+            scheduler.step(val_m["loss"])
 
     history_path = REPORTS_DIR / f"{run_name}_history.csv"
     save_history(history, history_path)
@@ -228,13 +246,16 @@ def main():
                         help="adam = torch.optim.Adam (baseline), adamw = torch.optim.AdamW")
     parser.add_argument("--weight-decay", type=float, default=WEIGHT_DECAY,
                         help="optimizer weight decay (default 0.0 = baseline)")
+    parser.add_argument("--scheduler", choices=list(SCHEDULER_PARAMS), default="none",
+                        help="learning-rate scheduler: none (baseline), step (StepLR 8/0.5), "
+                             "plateau (ReduceLROnPlateau on val loss, factor 0.5, patience 3)")
     args = parser.parse_args()
     if not 0.0 <= args.dropout < 1.0:
         parser.error("--dropout must be in [0, 1)")
     if args.weight_decay < 0.0:
         parser.error("--weight-decay must be >= 0")
     train(args.run_name, args.manifest, args.config, args.epochs, args.augmentation, args.dropout,
-          args.pooling, args.optimizer, args.weight_decay)
+          args.pooling, args.optimizer, args.weight_decay, args.scheduler)
 
 
 if __name__ == "__main__":
