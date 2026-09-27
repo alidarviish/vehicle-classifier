@@ -25,7 +25,7 @@ from torch.utils.data import DataLoader
 from torchvision import transforms
 
 from src.dataset import CLASS_TO_IDX, CLASSES, DEFAULT_CONFIG, DEFAULT_MANIFEST, VehicleDataset
-from src.model import BaselineCNN
+from src.model import POOLING_TYPES, BaselineCNN
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 REPORTS_DIR = REPO_ROOT / "reports"
@@ -148,16 +148,18 @@ def save_history(history, path):
         writer.writerows(history)
 
 
-def train(run_name, manifest_path, config_path, epochs=EPOCHS, augmentation="none", dropout=DROPOUT):
+def train(run_name, manifest_path, config_path, epochs=EPOCHS, augmentation="none", dropout=DROPOUT,
+          pooling="max"):
     set_seed()
     REPORTS_DIR.mkdir(exist_ok=True)
     CHECKPOINT_DIR.mkdir(exist_ok=True)
 
     train_loader, val_loader = build_loaders(manifest_path, config_path, TRAIN_TRANSFORMS[augmentation])
     print(f"device {DEVICE} | train {len(train_loader.dataset)} | val {len(val_loader.dataset)} "
-          f"| augmentation {augmentation} | dropout {dropout}")
+          f"| augmentation {augmentation} | dropout {dropout} | pooling {pooling}")
 
-    model = BaselineCNN(num_classes=len(CLASSES), image_size=IMAGE_SIZE, dropout=dropout).to(DEVICE)
+    model = BaselineCNN(num_classes=len(CLASSES), image_size=IMAGE_SIZE, dropout=dropout,
+                        pooling=pooling).to(DEVICE)
     criterion = nn.CrossEntropyLoss()
     optimizer = torch.optim.Adam(model.parameters(), lr=LEARNING_RATE, weight_decay=WEIGHT_DECAY)
 
@@ -190,7 +192,7 @@ def train(run_name, manifest_path, config_path, epochs=EPOCHS, augmentation="non
                               "augmentation_params": AUGMENTATION_PARAMS[augmentation]},
                 "seed": SEED,
                 "dropout": dropout,
-                "pooling": "max",
+                "pooling": pooling,
                 "optimizer": "adam",
                 "learning_rate": LEARNING_RATE,
                 "batch_size": BATCH_SIZE,
@@ -218,10 +220,13 @@ def main():
                         help="train-only augmentation (validation is never augmented)")
     parser.add_argument("--dropout", type=float, default=DROPOUT,
                         help="dropout probability in the classifier head (default 0.0 = baseline)")
+    parser.add_argument("--pooling", choices=list(POOLING_TYPES), default="max",
+                        help="2x2 pooling in every conv block (default max = baseline)")
     args = parser.parse_args()
     if not 0.0 <= args.dropout < 1.0:
         parser.error("--dropout must be in [0, 1)")
-    train(args.run_name, args.manifest, args.config, args.epochs, args.augmentation, args.dropout)
+    train(args.run_name, args.manifest, args.config, args.epochs, args.augmentation, args.dropout,
+          args.pooling)
 
 
 if __name__ == "__main__":
