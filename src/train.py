@@ -38,6 +38,7 @@ BATCH_SIZE = 32
 EPOCHS = 20
 LEARNING_RATE = 1e-3
 WEIGHT_DECAY = 0.0
+OPTIMIZERS = {"adam": torch.optim.Adam, "adamw": torch.optim.AdamW}
 DROPOUT = 0.0
 NORM_MEAN = [0.5, 0.5, 0.5]
 NORM_STD = [0.5, 0.5, 0.5]
@@ -149,19 +150,20 @@ def save_history(history, path):
 
 
 def train(run_name, manifest_path, config_path, epochs=EPOCHS, augmentation="none", dropout=DROPOUT,
-          pooling="max"):
+          pooling="max", optimizer_name="adam", weight_decay=WEIGHT_DECAY):
     set_seed()
     REPORTS_DIR.mkdir(exist_ok=True)
     CHECKPOINT_DIR.mkdir(exist_ok=True)
 
     train_loader, val_loader = build_loaders(manifest_path, config_path, TRAIN_TRANSFORMS[augmentation])
     print(f"device {DEVICE} | train {len(train_loader.dataset)} | val {len(val_loader.dataset)} "
-          f"| augmentation {augmentation} | dropout {dropout} | pooling {pooling}")
+          f"| augmentation {augmentation} | dropout {dropout} | pooling {pooling} "
+          f"| optimizer {optimizer_name} | weight_decay {weight_decay}")
 
     model = BaselineCNN(num_classes=len(CLASSES), image_size=IMAGE_SIZE, dropout=dropout,
                         pooling=pooling).to(DEVICE)
     criterion = nn.CrossEntropyLoss()
-    optimizer = torch.optim.Adam(model.parameters(), lr=LEARNING_RATE, weight_decay=WEIGHT_DECAY)
+    optimizer = OPTIMIZERS[optimizer_name](model.parameters(), lr=LEARNING_RATE, weight_decay=weight_decay)
 
     history = []
     best_f1 = -1.0
@@ -193,11 +195,11 @@ def train(run_name, manifest_path, config_path, epochs=EPOCHS, augmentation="non
                 "seed": SEED,
                 "dropout": dropout,
                 "pooling": pooling,
-                "optimizer": "adam",
+                "optimizer": optimizer_name,
                 "learning_rate": LEARNING_RATE,
                 "batch_size": BATCH_SIZE,
                 "scheduler": "none",
-                "weight_decay": WEIGHT_DECAY,
+                "weight_decay": weight_decay,
                 "loss_name": "ce",
                 "epoch": epoch,
                 "val_f1": best_f1,
@@ -222,11 +224,17 @@ def main():
                         help="dropout probability in the classifier head (default 0.0 = baseline)")
     parser.add_argument("--pooling", choices=list(POOLING_TYPES), default="max",
                         help="2x2 pooling in every conv block (default max = baseline)")
+    parser.add_argument("--optimizer", choices=list(OPTIMIZERS), default="adam",
+                        help="adam = torch.optim.Adam (baseline), adamw = torch.optim.AdamW")
+    parser.add_argument("--weight-decay", type=float, default=WEIGHT_DECAY,
+                        help="optimizer weight decay (default 0.0 = baseline)")
     args = parser.parse_args()
     if not 0.0 <= args.dropout < 1.0:
         parser.error("--dropout must be in [0, 1)")
+    if args.weight_decay < 0.0:
+        parser.error("--weight-decay must be >= 0")
     train(args.run_name, args.manifest, args.config, args.epochs, args.augmentation, args.dropout,
-          args.pooling)
+          args.pooling, args.optimizer, args.weight_decay)
 
 
 if __name__ == "__main__":
