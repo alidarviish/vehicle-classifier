@@ -148,16 +148,16 @@ def save_history(history, path):
         writer.writerows(history)
 
 
-def train(run_name, manifest_path, config_path, epochs=EPOCHS, augmentation="none"):
+def train(run_name, manifest_path, config_path, epochs=EPOCHS, augmentation="none", dropout=DROPOUT):
     set_seed()
     REPORTS_DIR.mkdir(exist_ok=True)
     CHECKPOINT_DIR.mkdir(exist_ok=True)
 
     train_loader, val_loader = build_loaders(manifest_path, config_path, TRAIN_TRANSFORMS[augmentation])
     print(f"device {DEVICE} | train {len(train_loader.dataset)} | val {len(val_loader.dataset)} "
-          f"| augmentation {augmentation}")
+          f"| augmentation {augmentation} | dropout {dropout}")
 
-    model = BaselineCNN(num_classes=len(CLASSES), image_size=IMAGE_SIZE, dropout=DROPOUT).to(DEVICE)
+    model = BaselineCNN(num_classes=len(CLASSES), image_size=IMAGE_SIZE, dropout=dropout).to(DEVICE)
     criterion = nn.CrossEntropyLoss()
     optimizer = torch.optim.Adam(model.parameters(), lr=LEARNING_RATE, weight_decay=WEIGHT_DECAY)
 
@@ -189,7 +189,7 @@ def train(run_name, manifest_path, config_path, epochs=EPOCHS, augmentation="non
                               "normalize_std": NORM_STD, "augmentation": augmentation,
                               "augmentation_params": AUGMENTATION_PARAMS[augmentation]},
                 "seed": SEED,
-                "dropout": DROPOUT,
+                "dropout": dropout,
                 "pooling": "max",
                 "optimizer": "adam",
                 "learning_rate": LEARNING_RATE,
@@ -216,8 +216,12 @@ def main():
     parser.add_argument("--epochs", type=int, default=EPOCHS)
     parser.add_argument("--augmentation", choices=list(TRAIN_TRANSFORMS), default="none",
                         help="train-only augmentation (validation is never augmented)")
+    parser.add_argument("--dropout", type=float, default=DROPOUT,
+                        help="dropout probability in the classifier head (default 0.0 = baseline)")
     args = parser.parse_args()
-    train(args.run_name, args.manifest, args.config, args.epochs, args.augmentation)
+    if not 0.0 <= args.dropout < 1.0:
+        parser.error("--dropout must be in [0, 1)")
+    train(args.run_name, args.manifest, args.config, args.epochs, args.augmentation, args.dropout)
 
 
 if __name__ == "__main__":
