@@ -1,8 +1,9 @@
-"""Train the baseline CNN on the train / val split.
+"""Train the baseline CNN (or a pretrained ResNet18) on the train / val split.
 
 Run from the repository root:
     python -m src.train
     python -m src.train --config configs/local_paths.json
+    python -m src.train --run-name resnet_feature_extraction --model resnet18 --resnet-mode feature_extraction
 
 Only the "train" and "val" rows of data/split_manifest.csv are used.
 The test set is not read anywhere in this file.
@@ -30,6 +31,7 @@ from torchvision import transforms
 from src.dataset import CLASS_TO_IDX, CLASSES, DEFAULT_CONFIG, DEFAULT_MANIFEST, VehicleDataset
 from src.balanced_sampler import BalancedBatchSampler
 from src.model import POOLING_TYPES, BaselineCNN
+from src.resnet import PRETRAINED_WEIGHTS, build_resnet18, count_params, trainable_parts, unfreeze_layer4
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 REPORTS_DIR = REPO_ROOT / "reports"
@@ -95,6 +97,21 @@ AUGMENTATION_PARAMS = {
                  "brightness": BRIGHTNESS, "contrast": CONTRAST},
 }
 
+# ResNet18 transfer learning: same size, no augmentation, ImageNet normalization
+# (the statistics the pretrained backbone was trained with); used for train and val
+MODELS = ("baseline", "resnet18")
+RESNET_MODES = ("feature_extraction", "fine_tuning")
+RESNET_NORM_MEAN = [0.485, 0.456, 0.406]
+RESNET_NORM_STD = [0.229, 0.224, 0.225]
+RESNET_TRANSFORM = transforms.Compose([
+    transforms.Resize((IMAGE_SIZE, IMAGE_SIZE)),
+    transforms.ToTensor(),
+    transforms.Normalize(mean=RESNET_NORM_MEAN, std=RESNET_NORM_STD),
+])
+RESNET_HEAD_LR = LEARNING_RATE   # new 8-class head (fc), 1e-3
+RESNET_LAYER4_LR = 1e-4          # pretrained layer4, 10x smaller
+FT_WARMUP_EPOCHS = 5             # fine-tuning: fc only in epochs 1-5, layer4 unfrozen from epoch 6
+
 DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 
@@ -135,9 +152,9 @@ def subset_indices(train_set, subset_path):
 
 
 def build_loaders(manifest_path, config_path, train_transform=BASE_TRANSFORM,
-                  train_subset=None, batch_mode="standard"):
+                  train_subset=None, batch_mode="standard", val_transform=BASE_TRANSFORM):
     train_set = VehicleDataset("train", train_transform, manifest_path, config_path)
-    val_set = VehicleDataset("val", BASE_TRANSFORM, manifest_path, config_path)  # never augmented
+    val_set = VehicleDataset("val", val_transform, manifest_path, config_path)  # never augmented
     labels = train_set.labels
     if train_subset is not None:
         indices = subset_indices(train_set, train_subset)
@@ -220,13 +237,19 @@ def save_history(history, path):
 
 def train(run_name, manifest_path, config_path, epochs=EPOCHS, augmentation="none", dropout=DROPOUT,
           pooling="max", optimizer_name="adam", weight_decay=WEIGHT_DECAY, scheduler_name="none",
-          train_subset=None, batch_mode="standard", loss_name="ce"):
+          train_subset=None, batch_mode="standard", loss_name="ce", model_name="baseline",
+          resnet_mode=None):
     set_seed()
     REPORTS_DIR.mkdir(exist_ok=True)
     CHECKPOINT_DIR.mkdir(exist_ok=True)
 
-    train_loader, val_loader = build_loaders(manifest_path, config_path, TRAIN_TRANSFORMS[augmentation],
-                                             train_subset, batch_mode)
+    is_resnet = model_name == "resnet18"
+    if is_resnet:
+        train_transform = val_transform = RESNET_TRANSFORM
+    else:
+        train_transform, val_transform = TRAIN_TRANSFORMS[augmentation], BASE_TRANSFORM
+    train_loader, val_loader = build_loaders(manifest_path, config_path, train_transform,
+                                             train_subset, batch_mode, val_transform)
     n_train = len(train_loader.dataset)
     subset_sha = file_sha256(train_subset) if train_subset is not None else None
     if train_subset is not None:
@@ -237,10 +260,25 @@ def train(run_name, manifest_path, config_path, epochs=EPOCHS, augmentation="non
           f"| optimizer {optimizer_name} | weight_decay {weight_decay} | scheduler {scheduler_name} "
           f"| loss {loss_name}")
 
-    model = BaselineCNN(num_classes=len(CLASSES), image_size=IMAGE_SIZE, dropout=dropout,
-                        pooling=pooling).to(DEVICE)
     criterion = build_criterion(loss_name)
-    optimizer = OPTIMIZERS[optimizer_name](model.parameters(), lr=LEARNING_RATE, weight_decay=weight_decay)
+    if is_resnet:
+        model = build_resnet18(num_classes=len(CLASSES)).to(DEVICE)   # backbone frozen, fc trainable
+        # fc from epoch 1; in fine-tuning the layer4 group is in the optimizer from the start,
+        # but its parameters have no gradient (frozen) until epoch 6, so the optimizer skips them
+        group_lrs = {"fc": RESNET_HEAD_LR}
+        param_groups = [{"params": list(model.net.fc.parameters()), "lr": RESNET_HEAD_LR}]
+        if resnet_mode == "fine_tuning":
+            group_lrs["layer4"] = RESNET_LAYER4_LR
+            param_groups.append({"params": list(model.net.layer4.parameters()), "lr": RESNET_LAYER4_LR})
+        optimizer = OPTIMIZERS[optimizer_name](param_groups, weight_decay=weight_decay)
+        trainable, frozen = count_params(model)
+        print(f"model resnet18 ({PRETRAINED_WEIGHTS}) | mode {resnet_mode} | trainable {trainable:,} "
+              f"| frozen {frozen:,} | lr per group {group_lrs}"
+              + (f" | layer4 unfrozen from epoch {FT_WARMUP_EPOCHS + 1}" if resnet_mode == "fine_tuning" else ""))
+    else:
+        model = BaselineCNN(num_classes=len(CLASSES), image_size=IMAGE_SIZE, dropout=dropout,
+                            pooling=pooling).to(DEVICE)
+        optimizer = OPTIMIZERS[optimizer_name](model.parameters(), lr=LEARNING_RATE, weight_decay=weight_decay)
     scheduler = None
     if scheduler_name == "step":
         scheduler = torch.optim.lr_scheduler.StepLR(optimizer, **SCHEDULER_PARAMS["step"])
@@ -254,6 +292,10 @@ def train(run_name, manifest_path, config_path, epochs=EPOCHS, augmentation="non
     for epoch in range(1, epochs + 1):
         if batch_mode == "balanced":
             train_loader.batch_sampler.set_epoch(epoch)
+        if is_resnet and resnet_mode == "fine_tuning" and epoch == FT_WARMUP_EPOCHS + 1:
+            unfreeze_layer4(model)
+            trainable, frozen = count_params(model)
+            print(f"epoch {epoch}: layer4 unfrozen | trainable {trainable:,} | frozen {frozen:,}")
         train_m = run_epoch(model, train_loader, criterion, optimizer, loss_name=loss_name)
         val_m = run_epoch(model, val_loader, criterion, loss_name=loss_name)
 
@@ -261,6 +303,8 @@ def train(run_name, manifest_path, config_path, epochs=EPOCHS, augmentation="non
         row.update({f"train_{k}": v for k, v in train_m.items()})
         row.update({f"val_{k}": v for k, v in val_m.items()})
         row["lr"] = optimizer.param_groups[0]["lr"]
+        if is_resnet:
+            row["trainable_params"] = count_params(model)[0]   # ResNet histories only
         history.append(row)
         print(f"epoch {epoch:2d} | train_loss {train_m['loss']:.4f} | val_loss {val_m['loss']:.4f} "
               f"| val_acc {val_m['accuracy']:.4f} | val_f1 {val_m['f1']:.4f}")
@@ -268,7 +312,7 @@ def train(run_name, manifest_path, config_path, epochs=EPOCHS, augmentation="non
         # save only when val macro F1 is strictly better (ties keep the earlier epoch)
         if val_m["f1"] > best_f1:
             best_f1 = val_m["f1"]
-            torch.save({
+            checkpoint = {
                 "model_state": model.state_dict(),
                 "class_to_idx": CLASS_TO_IDX,
                 "architecture": "BaselineCNN",
@@ -291,8 +335,25 @@ def train(run_name, manifest_path, config_path, epochs=EPOCHS, augmentation="non
                 "weight_decay": weight_decay,
                 "loss_name": loss_name,
                 "epoch": epoch,
-                "val_f1": best_f1,
-            }, checkpoint_path)
+                "val_f1": float(best_f1),   # plain float, so the checkpoint loads with torch.load(weights_only=True)
+            }
+            if is_resnet:
+                trainable, frozen = count_params(model)
+                checkpoint.update({
+                    "architecture": "ResNet18",
+                    "transform": {"resize": [IMAGE_SIZE, IMAGE_SIZE], "normalize_mean": RESNET_NORM_MEAN,
+                                  "normalize_std": RESNET_NORM_STD, "augmentation": "none",
+                                  "augmentation_params": None},
+                    "pooling": None,   # not used: ResNet18 has its own pooling
+                    "pretrained_weights": PRETRAINED_WEIGHTS,
+                    "resnet_mode": resnet_mode,
+                    "warmup_epochs": FT_WARMUP_EPOCHS if resnet_mode == "fine_tuning" else None,
+                    "trainable_parts": trainable_parts(model),
+                    "trainable_params": trainable,
+                    "frozen_params": frozen,
+                    "param_group_lrs": group_lrs,
+                })
+            torch.save(checkpoint, checkpoint_path)
             print(f"  -> saved {checkpoint_path.name} (val_f1 {best_f1:.4f})")
 
         # scheduler steps after the epoch is logged, so the "lr" column is the rate used in this epoch
@@ -332,14 +393,34 @@ def main():
                         help="standard = shuffled batches (baseline), balanced = 4 images per class per batch")
     parser.add_argument("--loss", choices=list(LOSSES), default="ce",
                         help="ce = CrossEntropyLoss (baseline), bce = BCEWithLogitsLoss on one-hot targets")
+    parser.add_argument("--model", choices=list(MODELS), default="baseline",
+                        help="baseline = BaselineCNN (default), resnet18 = pretrained ResNet18 (needs --resnet-mode)")
+    parser.add_argument("--resnet-mode", choices=list(RESNET_MODES), default=None,
+                        help="feature_extraction = only fc trained; fine_tuning = fc, then layer4 from epoch "
+                             f"{FT_WARMUP_EPOCHS + 1}")
     args = parser.parse_args()
+    if args.model == "resnet18":
+        if args.resnet_mode is None:
+            parser.error("--model resnet18 needs --resnet-mode feature_extraction|fine_tuning")
+        not_supported = [flag for flag, used in [
+            ("--augmentation", args.augmentation != "none"),
+            ("--dropout", args.dropout != DROPOUT),
+            ("--pooling", args.pooling != "max"),
+            ("--loss bce", args.loss != "ce"),
+            ("--batch-mode balanced", args.batch_mode != "standard"),
+            ("--train-subset", args.train_subset is not None),
+        ] if used]
+        if not_supported:
+            parser.error(f"not supported with --model resnet18: {', '.join(not_supported)}")
+    elif args.resnet_mode is not None:
+        parser.error("--resnet-mode is only used with --model resnet18")
     if not 0.0 <= args.dropout < 1.0:
         parser.error("--dropout must be in [0, 1)")
     if args.weight_decay < 0.0:
         parser.error("--weight-decay must be >= 0")
     train(args.run_name, args.manifest, args.config, args.epochs, args.augmentation, args.dropout,
           args.pooling, args.optimizer, args.weight_decay, args.scheduler,
-          args.train_subset, args.batch_mode, args.loss)
+          args.train_subset, args.batch_mode, args.loss, args.model, args.resnet_mode)
 
 
 if __name__ == "__main__":

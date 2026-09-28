@@ -9,8 +9,8 @@ Run from the repository root:
     python scripts/analyze_baseline.py --history-only               # curves only, no torch needed
 
 Reads reports/<run_name>_history.csv and checkpoints/<run_name>_best.pt.
-Evaluation always uses BASE_TRANSFORM (no augmentation) and the current labels
-in data/split_manifest.csv.
+Evaluation uses BASE_TRANSFORM for BaselineCNN and RESNET_TRANSFORM (ImageNet normalization)
+for ResNet18 checkpoints - never augmentation - and the current labels in data/split_manifest.csv.
 
 Outputs (all generated, ignored by git) in reports/analysis/ for the baseline,
 or reports/analysis/<run_name>/ for any other run (so baseline files are not overwritten):
@@ -34,6 +34,7 @@ if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))  # so "from src..." works with "python scripts/analyze_baseline.py"
 
 DEFAULT_RUN = "baseline"
+EVAL_TRANSFORM_NAMES = {"BaselineCNN": "BASE_TRANSFORM", "ResNet18": "RESNET_TRANSFORM"}
 
 
 def run_paths(run_name):
@@ -131,21 +132,29 @@ def evaluate_checkpoint(checkpoint_path, config_path):
 
     from src.dataset import CLASS_TO_IDX, CLASSES, DEFAULT_MANIFEST, VehicleDataset
     from src.model import BaselineCNN
-    from src.train import BASE_TRANSFORM, BATCH_SIZE
+    from src.train import BASE_TRANSFORM, BATCH_SIZE, RESNET_TRANSFORM
 
-    checkpoint = torch.load(checkpoint_path, map_location="cpu")
+    # weights_only=True (explicit; also the default from torch 2.6): only tensors and plain Python
+    # values are loaded. All checkpoints written by src/train.py hold only such values.
+    checkpoint = torch.load(checkpoint_path, map_location="cpu", weights_only=True)
     if checkpoint["class_to_idx"] != CLASS_TO_IDX:
         raise ValueError(f"class mapping in checkpoint differs: {checkpoint['class_to_idx']}")
-    if checkpoint["architecture"] != "BaselineCNN":
+    if checkpoint["architecture"] == "BaselineCNN":
+        model = BaselineCNN(num_classes=len(CLASSES), image_size=checkpoint["image_size"],
+                            dropout=checkpoint["dropout"],
+                            pooling=checkpoint.get("pooling", "max"))  # older checkpoints: max
+        eval_transform = BASE_TRANSFORM
+    elif checkpoint["architecture"] == "ResNet18":
+        from src.resnet import build_resnet18
+        # no download: the network is built empty and all weights come from the checkpoint
+        model = build_resnet18(num_classes=len(CLASSES), pretrained=False)
+        eval_transform = RESNET_TRANSFORM
+    else:
         raise ValueError(f"unexpected architecture: {checkpoint['architecture']}")
-
-    model = BaselineCNN(num_classes=len(CLASSES), image_size=checkpoint["image_size"],
-                        dropout=checkpoint["dropout"],
-                        pooling=checkpoint.get("pooling", "max"))  # older checkpoints: max
     model.load_state_dict(checkpoint["model_state"])
     model.eval()
 
-    val_set = VehicleDataset("val", BASE_TRANSFORM, DEFAULT_MANIFEST, config_path)  # no augmentation
+    val_set = VehicleDataset("val", eval_transform, DEFAULT_MANIFEST, config_path)  # no augmentation
     loader = DataLoader(val_set, batch_size=BATCH_SIZE, shuffle=False)
 
     y_true, y_pred = [], []
@@ -240,7 +249,7 @@ def main():
             f"- macro F1 {macro_f1:.4f} (stored in checkpoint: {checkpoint['val_f1']:.4f}), accuracy {accuracy:.4f}",
             f"- macro precision {macro_p:.4f}, macro recall {macro_r:.4f}",
             f"- train augmentation recorded in checkpoint: {checkpoint.get('transform', {}).get('augmentation', 'not recorded')} "
-            f"(evaluation uses BASE_TRANSFORM, no augmentation)",
+            f"(evaluation uses {EVAL_TRANSFORM_NAMES[checkpoint['architecture']]}, no augmentation)",
             "",
             "Confusion matrix (rows = true, columns = predicted): " + ", ".join(classes),
             *[f"  {classes[i]:10s} " + " ".join(f"{int(v):3d}" for v in matrix[i]) for i in labels],
