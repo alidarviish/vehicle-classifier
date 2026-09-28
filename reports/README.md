@@ -25,14 +25,59 @@ been evaluated.
 | [ResNet18](experiments/08_resnet.md) | `resnet224_fine_tuning` | 8 | 0.9530 | 0.9448 | 0.9421 | 0.9432 | Head only in epochs 1-5, then `layer4` + head |
 | [ResNet18](experiments/08_resnet.md) | `resnet_feature_extraction` | 7 | 0.8771 | 0.8781 | 0.8592 | 0.8666 | Exploratory run at 128x128 input |
 | [ResNet18](experiments/08_resnet.md) | `resnet_finetuning` | 7 | 0.9241 | 0.9173 | 0.9168 | 0.9165 | Exploratory run at 128x128 input |
+| [Combined](experiments/09_combined_aug_plateau.md) | `combo_aug_plateau` | 18 | 0.8983 | 0.8875 | 0.8844 | 0.8853 | `full_aug` + ReduceLROnPlateau (0.5, 3); lr halved after epochs 13 and 18 |
+| [Combined](experiments/09_combined_aug_plateau.md) | `combo_aug_do05_wd1e4_plateau` | 14 | 0.8847 | 0.8682 | 0.8552 | 0.8590 | As above + dropout 0.5 + AdamW weight decay 1e-4; lr never reduced |
 
 Experiments 01-05 and 07 each change one factor relative to the baseline setup. Experiment 06
 trains the baseline model on a simulated-imbalance subset of the training split and compares its two
 batch modes with each other. Experiment 08 uses a pretrained ResNet18 with 224x224 input and
-ImageNet normalization and compares feature extraction with fine-tuning. See the linked report for
-the exact settings, per-class results and limitations.
+ImageNet normalization and compares feature extraction with fine-tuning. Experiment 09 tests two
+combinations on the baseline CNN (augmentation + scheduler, then also dropout + weight decay). See
+the linked report for the exact settings, per-class results and limitations.
 
-Other folders:
+## Validation comparison table
+
+Main experiments of the assignment, compared on validation only: 659 images of
+`data/split_manifest.csv` with the current labels, seed 42. Each row is the checkpoint with the highest
+validation macro F1 of that run. The lowest-recall and lowest-precision classes come from the
+per-class metrics of the same checkpoint (no ties in any row). The test set and the Neysan images
+were not used in this comparison.
+
+| Experiment | Run | Accuracy | Macro Precision | Macro Recall | Macro F1 | Lowest-Recall Class | Lowest-Precision Class |
+|---|---|---:|---:|---:|---:|---|---|
+| CNN baseline [1] | `baseline` | 0.8801 | 0.8646 | 0.8509 | 0.8561 | vanet (0.5769) | vanet (0.6818) |
+| Balanced batches: standard [2] | `balanced_standard` | 0.6707 | 0.7336 | 0.6568 | 0.6120 | kamyun (0.1398) | vanet (0.4615) |
+| Balanced batches: balanced [2] | `balanced_sampler` | 0.6525 | 0.7055 | 0.6372 | 0.5871 | kamyun (0.0968) | vanet (0.3103) |
+| CE [3] | `loss_ce` | 0.8801 | 0.8646 | 0.8509 | 0.8561 | vanet (0.5769) | vanet (0.6818) |
+| BCE [3] | `loss_bce` | 0.8816 | 0.8747 | 0.8482 | 0.8568 | vanet (0.5385) | vanet (0.7778) |
+| Best regularized + scheduled [4] | `combo_aug_plateau` | 0.8983 | 0.8875 | 0.8844 | 0.8853 | vanet (0.7692) | vanet (0.7407) |
+| ResNet18 feature extraction | `resnet224_feature_extraction` | 0.9181 | 0.9081 | 0.9038 | 0.9055 | vanet (0.7692) | vanet (0.8000) |
+| ResNet18 fine-tuning | `resnet224_fine_tuning` | 0.9530 | 0.9448 | 0.9421 | 0.9432 | vanet (0.8462) | vanet (0.8462) |
+
+[1] The baseline is reported with the current validation labels. These include 8 label
+corrections: 7 kamyun -> kamyunet and 1 kamyunet -> kamyun. The metrics were recalculated from
+the saved predictions of the same checkpoint (epoch 18). With the original labels the same
+checkpoint gives accuracy 0.8680, macro precision 0.8539, macro recall 0.8402 and macro F1 0.8456.
+Its lowest-recall and lowest-precision class is also vanet, with the same values (0.5769 and
+0.6818). `loss_ce` and `adamw_wd0` have the same configuration and the same metrics with the
+current labels.
+
+[2] The balanced runs were trained on the simulated-imbalance subset
+`decisions/imbalanced_train.csv` (1673 images), not on the full 2633-image training split. The
+validation set is the same. These two rows compare with each other, not directly with the other
+rows.
+
+[3] CE and BCE form one controlled comparison: same configuration, only the loss differs. They are
+not two independent candidates for the final model. The production model is a CrossEntropy
+(softmax) model, and BCE is reported for comparison only.
+
+[4] Selected on validation. Only two runs combine regularization with a scheduler:
+`combo_aug_plateau` (macro F1 0.8853) and `combo_aug_do05_wd1e4_plateau` (macro F1 0.8590). In the
+selected run, the regularization is augmentation (`full_aug`), combined with ReduceLROnPlateau,
+which halved the learning rate after epochs 13 and 18. Each run was trained once with seed 42. See
+`experiments/09_combined_aug_plateau.md`.
+
+## Other folders
 
 - `audit/`: initial dataset audit (counts and exact duplicates).
 - `analysis/`: generated analysis output (ignored by Git), one folder per analysed run:
