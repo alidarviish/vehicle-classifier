@@ -88,6 +88,25 @@ After a visual review of baseline validation errors, 8 validation images were re
 - The 8 human label corrections are applied to the `label` column after the split; all 8 are in
   validation.
 
+## Images from `unclean` folders in the training data
+
+- Images with `origin_split=unclean` enter `train_val_pool` only after the project's cleaning steps:
+  exact-duplicate and Test-leakage checks by SHA256 (`reports/audit/exact_duplicates.csv`), the
+  recorded exclusions (`decisions/old_label_overrides.csv`, 47 excluded), the Neysan review
+  (`decisions/neysan_review.csv`, `decisions/neysan_test_review.csv`, policy N1) and the recorded
+  label review and corrections (`decisions/kamyun_kamyunet_review.csv`,
+  `decisions/kamyunet_kamyun_review.csv`).
+- Once in `train_val_pool` and then in `data/split_manifest.csv`, these images are cleaned training
+  data. `origin_split=unclean` only records where an image originally came from.
+- This follows the project decision to merge the valid data of both sources (v1 and v2) for the
+  main experiment. In the current split, 1258 of the 2633 train images and 315 of the 659
+  validation images have `origin_split=unclean`.
+- Balanced-batches experiment: the simulated imbalance is built only by removing images from the
+  current 2633 train images; no image from `unclean` (or anywhere else) is added to train.
+  Validation stays the current 659 images and Test stays the frozen Test (`decisions/test_frozen.csv`).
+- This records how the existing data is interpreted; it does not change the dataset, the statuses
+  or the split.
+
 ## Neysan evaluation (`neysan_eval`)
 
 - 621 images: 371 human-confirmed `CONFIRMED_NEYSAN` (337 from `decisions/neysan_review.csv`,
