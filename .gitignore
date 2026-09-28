@@ -63,6 +63,8 @@ reports/*_history.csv
 reports/analysis/
 
 # ---- Python, notebooks, caches ----
+# personal study notebooks (never committed)
+notebooks/
 __pycache__/
 *.py[cod]
 .ipynb_checkpoints/
