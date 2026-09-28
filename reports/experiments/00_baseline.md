@@ -22,9 +22,23 @@
 
 The validation metrics above use the current labels in `data/split_manifest.csv`
 (after the human-reviewed kamyun/kamyunet corrections, all in the validation split).
-They were recalculated from the saved predictions of the same checkpoint; the model
-was not retrained. The training history itself (including the validation loss of
-0.7991 at epoch 18) was logged with the original folder labels.
+They were recalculated from the saved predictions of the same checkpoint; the baseline
+was not retrained for this.
+
+## Validation loss
+
+| | Original folder labels | Current labels |
+|---|---|---|
+| Lowest validation loss | 0.4921 at epoch 5 | 0.4400 at epoch 5 |
+| Validation loss at the best-F1 epoch (18) | 0.7991 | 0.7191 |
+
+- Original-label values: `reports/baseline_history.csv`, logged during the baseline run before
+  the 8 validation label corrections.
+- Current-label values: the history of `adamw_wd0` (`reports/adamw_wd0_history.csv`, byte-identical
+  to `reports/loss_ce_history.csv`). That run follows the same training path as the baseline:
+  its training columns are identical to `baseline_history.csv` for all 20 epochs, and its best
+  checkpoint (epoch 18) has the same weights as `checkpoints/baseline_best.pt`. Only its validation
+  columns were computed with the current labels.
 
 ## Scope
 

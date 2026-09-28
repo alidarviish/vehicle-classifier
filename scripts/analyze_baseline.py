@@ -13,8 +13,8 @@ Evaluation uses BASE_TRANSFORM for BaselineCNN and, for ResNet18 checkpoints, th
 ImageNet normalization recorded in the checkpoint - never augmentation - and the current labels
 in data/split_manifest.csv.
 
-Outputs (all generated, ignored by git) in reports/analysis/ for the baseline,
-or reports/analysis/<run_name>/ for any other run (so baseline files are not overwritten):
+Outputs (all generated, ignored by git) in reports/analysis/<run_name>/ for every run,
+including the baseline (reports/analysis/baseline/):
     loss_curves.png, val_f1_curve.png          from the history CSV
     confusion_matrix.csv / .png                val set, best checkpoint
     per_class_metrics.csv                      precision / recall / F1 / support
@@ -42,9 +42,7 @@ def run_paths(run_name):
     """History, checkpoint and output folder of one run."""
     history = REPO_ROOT / "reports" / f"{run_name}_history.csv"
     checkpoint = REPO_ROOT / "checkpoints" / f"{run_name}_best.pt"
-    out_dir = REPO_ROOT / "reports" / "analysis"
-    if run_name != DEFAULT_RUN:
-        out_dir = out_dir / run_name
+    out_dir = REPO_ROOT / "reports" / "analysis" / run_name
     return history, checkpoint, out_dir
 
 

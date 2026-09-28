@@ -119,11 +119,16 @@ From the training histories:
 
 | | Baseline (0.0) | dropout_03 (0.3) | dropout_05 (0.5) |
 |---|---|---|---|
-| Lowest validation loss (epoch) | 0.4921 (5) | 0.3865 (10) | 0.4153 (8) |
-| Validation loss at best epoch | 0.7991 | 0.6247 | 0.4575 |
+| Lowest validation loss (epoch) | 0.4400 (5)* | 0.3865 (10) | 0.4153 (8) |
+| Validation loss at best epoch | 0.7191* | 0.6247 | 0.4575 |
 | Train loss at epoch 20 | 0.0001 | 0.0582 | 0.1328 |
 | Train accuracy reaches 1.0 | from epoch 15 | no | no |
-| Train F1 - val F1 at epoch 20 | 0.1587 | 0.1228 | 0.1033 |
+| Train F1 - val F1 at epoch 20 | 0.1482* | 0.1228 | 0.1033 |
+
+\* Current labels. The baseline history was logged before the 8 validation label corrections
+(original-label values: 0.4921 at epoch 5, 0.7991 at epoch 18, train-val F1 gap 0.1587); these
+values come from the `adamw_wd0` / `loss_ce` history, which has the same training path and weights
+as the baseline (see `00_baseline.md`).
 
 - With higher dropout, train loss at the end of training is higher and the gap between train
   and validation metrics is smaller.
@@ -159,4 +164,4 @@ These are observations only; this experiment does not establish their cause.
 - Histories: `reports/dropout_03_history.csv`, `reports/dropout_05_history.csv`
   (baseline: `reports/baseline_history.csv`)
 - Analysis output: `reports/analysis/dropout_03/`, `reports/analysis/dropout_05/`
-  (baseline, current labels: `reports/analysis/baseline_eval_final_labels.txt`)
+  (baseline, current labels: `reports/analysis/baseline/baseline_eval_final_labels.txt`)
