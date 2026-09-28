@@ -9,8 +9,9 @@ Run from the repository root:
     python scripts/analyze_baseline.py --history-only               # curves only, no torch needed
 
 Reads reports/<run_name>_history.csv and checkpoints/<run_name>_best.pt.
-Evaluation uses BASE_TRANSFORM for BaselineCNN and RESNET_TRANSFORM (ImageNet normalization)
-for ResNet18 checkpoints - never augmentation - and the current labels in data/split_manifest.csv.
+Evaluation uses BASE_TRANSFORM for BaselineCNN and, for ResNet18 checkpoints, the resize and
+ImageNet normalization recorded in the checkpoint - never augmentation - and the current labels
+in data/split_manifest.csv.
 
 Outputs (all generated, ignored by git) in reports/analysis/ for the baseline,
 or reports/analysis/<run_name>/ for any other run (so baseline files are not overwritten):
@@ -132,7 +133,7 @@ def evaluate_checkpoint(checkpoint_path, config_path):
 
     from src.dataset import CLASS_TO_IDX, CLASSES, DEFAULT_MANIFEST, VehicleDataset
     from src.model import BaselineCNN
-    from src.train import BASE_TRANSFORM, BATCH_SIZE, RESNET_TRANSFORM
+    from src.train import BASE_TRANSFORM, BATCH_SIZE, resnet_transform
 
     # weights_only=True (explicit; also the default from torch 2.6): only tensors and plain Python
     # values are loaded. All checkpoints written by src/train.py hold only such values.
@@ -148,7 +149,10 @@ def evaluate_checkpoint(checkpoint_path, config_path):
         from src.resnet import build_resnet18
         # no download: the network is built empty and all weights come from the checkpoint
         model = build_resnet18(num_classes=len(CLASSES), pretrained=False)
-        eval_transform = RESNET_TRANSFORM
+        # the transform the checkpoint was trained with (224 now; earlier exploratory runs: 128)
+        recorded = checkpoint["transform"]
+        eval_transform = resnet_transform(recorded["resize"][0], recorded["normalize_mean"],
+                                          recorded["normalize_std"])
     else:
         raise ValueError(f"unexpected architecture: {checkpoint['architecture']}")
     model.load_state_dict(checkpoint["model_state"])

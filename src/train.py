@@ -97,17 +97,26 @@ AUGMENTATION_PARAMS = {
                  "brightness": BRIGHTNESS, "contrast": CONTRAST},
 }
 
-# ResNet18 transfer learning: same size, no augmentation, ImageNet normalization
-# (the statistics the pretrained backbone was trained with); used for train and val
+# ResNet18 transfer learning: ImageNet-compatible input (224x224, the size the pretrained
+# backbone was trained on) and ImageNet normalization; no augmentation; used for train and val.
+# The baseline keeps IMAGE_SIZE = 128.
 MODELS = ("baseline", "resnet18")
 RESNET_MODES = ("feature_extraction", "fine_tuning")
+RESNET_IMAGE_SIZE = 224
 RESNET_NORM_MEAN = [0.485, 0.456, 0.406]
 RESNET_NORM_STD = [0.229, 0.224, 0.225]
-RESNET_TRANSFORM = transforms.Compose([
-    transforms.Resize((IMAGE_SIZE, IMAGE_SIZE)),
-    transforms.ToTensor(),
-    transforms.Normalize(mean=RESNET_NORM_MEAN, std=RESNET_NORM_STD),
-])
+
+
+def resnet_transform(size=RESNET_IMAGE_SIZE, mean=RESNET_NORM_MEAN, std=RESNET_NORM_STD):
+    """Resize (whole image, no crop) -> tensor -> ImageNet normalization."""
+    return transforms.Compose([
+        transforms.Resize((size, size)),
+        transforms.ToTensor(),
+        transforms.Normalize(mean=mean, std=std),
+    ])
+
+
+RESNET_TRANSFORM = resnet_transform()
 RESNET_HEAD_LR = LEARNING_RATE   # new 8-class head (fc), 1e-3
 RESNET_LAYER4_LR = 1e-4          # pretrained layer4, 10x smaller
 FT_WARMUP_EPOCHS = 5             # fine-tuning: fc only in epochs 1-5, layer4 unfrozen from epoch 6
@@ -341,7 +350,8 @@ def train(run_name, manifest_path, config_path, epochs=EPOCHS, augmentation="non
                 trainable, frozen = count_params(model)
                 checkpoint.update({
                     "architecture": "ResNet18",
-                    "transform": {"resize": [IMAGE_SIZE, IMAGE_SIZE], "normalize_mean": RESNET_NORM_MEAN,
+                    "image_size": RESNET_IMAGE_SIZE,
+                    "transform": {"resize": [RESNET_IMAGE_SIZE, RESNET_IMAGE_SIZE], "normalize_mean": RESNET_NORM_MEAN,
                                   "normalize_std": RESNET_NORM_STD, "augmentation": "none",
                                   "augmentation_params": None},
                     "pooling": None,   # not used: ResNet18 has its own pooling

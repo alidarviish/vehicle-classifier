@@ -3,7 +3,7 @@
 No training run, no data, no download:
 - the network is built with pretrained=False (random weights). The checks are about structure,
   freezing, BatchNorm modes, optimizer groups and output shape, which do not depend on weight values;
-- inputs are random tensors of shape 2 x 3 x 128 x 128; nothing is saved.
+- inputs are random tensors of shape 2 x 3 x 224 x 224; nothing is saved.
 Check 7 calls optimizer.step() on these throwaway models, only to confirm that Adam leaves
 frozen layer4 unchanged during the warm-up epochs.
 
@@ -24,13 +24,15 @@ if str(REPO_ROOT) not in sys.path:
 
 import torch
 import torchvision
+from PIL import Image
 from torch import nn
 
 from src.dataset import CLASS_TO_IDX
 from src.resnet import (BACKBONE_PARTS, PRETRAINED_WEIGHTS, ResNet18Classifier, build_resnet18, count_params,
                         trainable_parts, unfreeze_layer4)
 from src.train import (BATCH_SIZE, FT_WARMUP_EPOCHS, IMAGE_SIZE, LEARNING_RATE, OPTIMIZERS,
-                       RESNET_HEAD_LR, RESNET_LAYER4_LR, RESNET_NORM_MEAN, RESNET_NORM_STD, WEIGHT_DECAY)
+                       RESNET_HEAD_LR, RESNET_IMAGE_SIZE, RESNET_LAYER4_LR, RESNET_NORM_MEAN,
+                       RESNET_NORM_STD, RESNET_TRANSFORM, WEIGHT_DECAY, resnet_transform)
 
 SEED = 42
 NUM_CLASSES = 8
@@ -54,7 +56,7 @@ def new_model():
 
 def random_batch(seed=0):
     g = torch.Generator().manual_seed(seed)
-    images = torch.randn(BATCH, 3, IMAGE_SIZE, IMAGE_SIZE, generator=g)
+    images = torch.randn(BATCH, 3, RESNET_IMAGE_SIZE, RESNET_IMAGE_SIZE, generator=g)
     labels = torch.tensor([0, 1])
     return images, labels
 
@@ -212,8 +214,13 @@ def check_5_fine_tuning_after_unfreeze():
 
 def check_6_forward_shape():
     p = []
+    if RESNET_IMAGE_SIZE != 224:
+        p.append(f"RESNET_IMAGE_SIZE in src/train.py is {RESNET_IMAGE_SIZE}, expected 224")
     if IMAGE_SIZE != 128:
-        p.append(f"IMAGE_SIZE in src/train.py is {IMAGE_SIZE}, expected 128")
+        p.append(f"baseline IMAGE_SIZE in src/train.py is {IMAGE_SIZE}, expected 128 (must stay unchanged)")
+    tensor = RESNET_TRANSFORM(Image.new("RGB", (300, 180)))   # any input size -> 3 x 224 x 224
+    if tuple(tensor.shape) != (3, RESNET_IMAGE_SIZE, RESNET_IMAGE_SIZE):
+        p.append(f"RESNET_TRANSFORM output {tuple(tensor.shape)}, expected (3, {RESNET_IMAGE_SIZE}, {RESNET_IMAGE_SIZE})")
     images, _ = random_batch()
     for label, m in [("feature extraction", new_model()), ("fine-tuning after unfreeze", new_model())]:
         if label.startswith("fine"):
@@ -326,8 +333,8 @@ def check_9_checkpoint_round_trip():
         "model_state": m.state_dict(),
         "class_to_idx": CLASS_TO_IDX,
         "architecture": "ResNet18",
-        "image_size": IMAGE_SIZE,
-        "transform": {"resize": [IMAGE_SIZE, IMAGE_SIZE], "normalize_mean": RESNET_NORM_MEAN,
+        "image_size": RESNET_IMAGE_SIZE,
+        "transform": {"resize": [RESNET_IMAGE_SIZE, RESNET_IMAGE_SIZE], "normalize_mean": RESNET_NORM_MEAN,
                       "normalize_std": RESNET_NORM_STD, "augmentation": "none", "augmentation_params": None},
         "seed": SEED,
         "dropout": 0.0,
@@ -365,6 +372,17 @@ def check_9_checkpoint_round_trip():
             p.append(f"metadata '{key}' not loaded back unchanged: {loaded.get(key, '<missing>')!r}")
     if list(loaded["model_state"]) != list(checkpoint["model_state"]):
         p.append("model_state keys differ after torch.save / torch.load")
+    if loaded["image_size"] != 224 or loaded["transform"]["resize"] != [224, 224]:
+        p.append(f"checkpoint records image_size {loaded['image_size']} / resize {loaded['transform']['resize']}, "
+                 "expected 224 / [224, 224]")
+
+    # analyze_baseline.py rebuilds the ResNet transform from the checkpoint: 224 for new checkpoints,
+    # 128 for the earlier exploratory ones
+    image = Image.new("RGB", (300, 180))
+    for size in (loaded["transform"]["resize"][0], 128):
+        rebuilt = resnet_transform(size, loaded["transform"]["normalize_mean"], loaded["transform"]["normalize_std"])
+        if tuple(rebuilt(image).shape) != (3, size, size):
+            p.append(f"transform rebuilt from checkpoint metadata (resize {size}) gives {tuple(rebuilt(image).shape)}")
 
     other = new_model()
     other.load_state_dict(loaded["model_state"], strict=True)
@@ -395,10 +413,11 @@ CHECKS = [
     ("3 feature extraction: only fc trainable / in train mode, frozen BatchNorm in eval", check_3_feature_extraction_modes),
     (f"4 fine-tuning epochs 1-{FT_WARMUP_EPOCHS}: only fc trainable, layer4 frozen / eval", check_4_fine_tuning_before_unfreeze),
     ("5 fine-tuning after unfreeze: layer4 + fc trainable, layer4 BatchNorm train, conv1/bn1/layer1-3 frozen / eval", check_5_fine_tuning_after_unfreeze),
-    (f"6 forward {BATCH}x3x128x128 -> {BATCH}x{NUM_CLASSES}", check_6_forward_shape),
+    (f"6 transform and forward {BATCH}x3x{RESNET_IMAGE_SIZE}x{RESNET_IMAGE_SIZE} -> {BATCH}x{NUM_CLASSES}",
+     check_6_forward_shape),
     ("7 optimizer groups, learning rates and gradients", check_7_optimizer),
     ("8 BatchNorm running statistics of frozen parts unchanged", check_8_batchnorm_stats),
-    ("9 checkpoint round trip in memory (torch.save / torch.load as in analyze_baseline.py, strict=True)",
+    ("9 checkpoint round trip in memory (torch.save / torch.load as in analyze_baseline.py, strict=True, size 224)",
      check_9_checkpoint_round_trip),
 ]
 
