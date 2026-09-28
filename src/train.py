@@ -23,6 +23,7 @@ import numpy as np
 import torch
 from sklearn.metrics import precision_recall_fscore_support
 from torch import nn
+import torch.nn.functional as F
 from torch.utils.data import DataLoader, Subset
 from torchvision import transforms
 
@@ -107,6 +108,7 @@ def set_seed(seed=SEED):
 
 
 BATCH_MODES = ("standard", "balanced")
+LOSSES = ("ce", "bce")
 
 
 def subset_indices(train_set, subset_path):
@@ -159,7 +161,16 @@ def file_sha256(path):
         return hashlib.sha256(f.read()).hexdigest()
 
 
-def run_epoch(model, loader, criterion, optimizer=None):
+def build_criterion(loss_name):
+    """ce = CrossEntropyLoss (baseline); bce = BCEWithLogitsLoss on one-hot targets (sigmoid is inside the loss)."""
+    if loss_name == "ce":
+        return nn.CrossEntropyLoss()
+    if loss_name == "bce":
+        return nn.BCEWithLogitsLoss()
+    raise ValueError(f"unknown loss_name: {loss_name}")
+
+
+def run_epoch(model, loader, criterion, optimizer=None, loss_name="ce"):
     """One pass over a loader. Trains if an optimizer is given, otherwise only evaluates."""
     is_train = optimizer is not None
     model.train() if is_train else model.eval()
@@ -171,7 +182,11 @@ def run_epoch(model, loader, criterion, optimizer=None):
         for images, labels in loader:
             images, labels = images.to(DEVICE), labels.to(DEVICE)
             logits = model(images)
-            loss = criterion(logits, labels)
+            if loss_name == "bce":
+                targets = F.one_hot(labels, num_classes=len(CLASSES)).float()
+                loss = criterion(logits, targets)
+            else:
+                loss = criterion(logits, labels)
 
             if is_train:
                 optimizer.zero_grad()
@@ -205,7 +220,7 @@ def save_history(history, path):
 
 def train(run_name, manifest_path, config_path, epochs=EPOCHS, augmentation="none", dropout=DROPOUT,
           pooling="max", optimizer_name="adam", weight_decay=WEIGHT_DECAY, scheduler_name="none",
-          train_subset=None, batch_mode="standard"):
+          train_subset=None, batch_mode="standard", loss_name="ce"):
     set_seed()
     REPORTS_DIR.mkdir(exist_ok=True)
     CHECKPOINT_DIR.mkdir(exist_ok=True)
@@ -219,11 +234,12 @@ def train(run_name, manifest_path, config_path, epochs=EPOCHS, augmentation="non
               f"| batch_mode {batch_mode} | {len(train_loader)} batches per epoch")
     print(f"device {DEVICE} | train {len(train_loader.dataset)} | val {len(val_loader.dataset)} "
           f"| augmentation {augmentation} | dropout {dropout} | pooling {pooling} "
-          f"| optimizer {optimizer_name} | weight_decay {weight_decay} | scheduler {scheduler_name}")
+          f"| optimizer {optimizer_name} | weight_decay {weight_decay} | scheduler {scheduler_name} "
+          f"| loss {loss_name}")
 
     model = BaselineCNN(num_classes=len(CLASSES), image_size=IMAGE_SIZE, dropout=dropout,
                         pooling=pooling).to(DEVICE)
-    criterion = nn.CrossEntropyLoss()
+    criterion = build_criterion(loss_name)
     optimizer = OPTIMIZERS[optimizer_name](model.parameters(), lr=LEARNING_RATE, weight_decay=weight_decay)
     scheduler = None
     if scheduler_name == "step":
@@ -238,8 +254,8 @@ def train(run_name, manifest_path, config_path, epochs=EPOCHS, augmentation="non
     for epoch in range(1, epochs + 1):
         if batch_mode == "balanced":
             train_loader.batch_sampler.set_epoch(epoch)
-        train_m = run_epoch(model, train_loader, criterion, optimizer)
-        val_m = run_epoch(model, val_loader, criterion)
+        train_m = run_epoch(model, train_loader, criterion, optimizer, loss_name=loss_name)
+        val_m = run_epoch(model, val_loader, criterion, loss_name=loss_name)
 
         row = {"epoch": epoch}
         row.update({f"train_{k}": v for k, v in train_m.items()})
@@ -273,7 +289,7 @@ def train(run_name, manifest_path, config_path, epochs=EPOCHS, augmentation="non
                 "scheduler": scheduler_name,
                 "scheduler_params": SCHEDULER_PARAMS[scheduler_name],
                 "weight_decay": weight_decay,
-                "loss_name": "ce",
+                "loss_name": loss_name,
                 "epoch": epoch,
                 "val_f1": best_f1,
             }, checkpoint_path)
@@ -314,6 +330,8 @@ def main():
                         help="CSV of train images to use (e.g. decisions/imbalanced_train.csv); default: full train split")
     parser.add_argument("--batch-mode", choices=list(BATCH_MODES), default="standard",
                         help="standard = shuffled batches (baseline), balanced = 4 images per class per batch")
+    parser.add_argument("--loss", choices=list(LOSSES), default="ce",
+                        help="ce = CrossEntropyLoss (baseline), bce = BCEWithLogitsLoss on one-hot targets")
     args = parser.parse_args()
     if not 0.0 <= args.dropout < 1.0:
         parser.error("--dropout must be in [0, 1)")
@@ -321,7 +339,7 @@ def main():
         parser.error("--weight-decay must be >= 0")
     train(args.run_name, args.manifest, args.config, args.epochs, args.augmentation, args.dropout,
           args.pooling, args.optimizer, args.weight_decay, args.scheduler,
-          args.train_subset, args.batch_mode)
+          args.train_subset, args.batch_mode, args.loss)
 
 
 if __name__ == "__main__":
