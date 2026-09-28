@@ -14,6 +14,8 @@ Outputs:
 
 import argparse
 import csv
+import hashlib
+import math
 import random
 from pathlib import Path
 
@@ -21,10 +23,11 @@ import numpy as np
 import torch
 from sklearn.metrics import precision_recall_fscore_support
 from torch import nn
-from torch.utils.data import DataLoader
+from torch.utils.data import DataLoader, Subset
 from torchvision import transforms
 
 from src.dataset import CLASS_TO_IDX, CLASSES, DEFAULT_CONFIG, DEFAULT_MANIFEST, VehicleDataset
+from src.balanced_sampler import BalancedBatchSampler
 from src.model import POOLING_TYPES, BaselineCNN
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
@@ -103,12 +106,57 @@ def set_seed(seed=SEED):
         torch.cuda.manual_seed_all(seed)
 
 
-def build_loaders(manifest_path, config_path, train_transform=BASE_TRANSFORM):
+BATCH_MODES = ("standard", "balanced")
+
+
+def subset_indices(train_set, subset_path):
+    """Indices into the train split for the images listed in a subset CSV (CSV order kept).
+
+    Every image must be in the train split, listed once, with the same label as in the split.
+    """
+    position = {p: i for i, p in enumerate(train_set.image_paths)}
+    indices, seen = [], set()
+    with open(subset_path, "r", encoding="utf-8", newline="") as f:
+        for line, row in enumerate(csv.DictReader(f), start=2):
+            path = row["image_path"]
+            if path in seen:
+                raise ValueError(f"{subset_path} line {line}: image listed twice: {path}")
+            if path not in position:
+                raise ValueError(f"{subset_path} line {line}: not a train image of the split: {path}")
+            if CLASS_TO_IDX.get(row["label"]) != train_set.labels[position[path]]:
+                raise ValueError(f"{subset_path} line {line}: label '{row['label']}' differs from the split: {path}")
+            seen.add(path)
+            indices.append(position[path])
+    if not indices:
+        raise ValueError(f"{subset_path} has no rows")
+    return indices
+
+
+def build_loaders(manifest_path, config_path, train_transform=BASE_TRANSFORM,
+                  train_subset=None, batch_mode="standard"):
     train_set = VehicleDataset("train", train_transform, manifest_path, config_path)
     val_set = VehicleDataset("val", BASE_TRANSFORM, manifest_path, config_path)  # never augmented
-    train_loader = DataLoader(train_set, batch_size=BATCH_SIZE, shuffle=True)
+    labels = train_set.labels
+    if train_subset is not None:
+        indices = subset_indices(train_set, train_subset)
+        labels = [train_set.labels[i] for i in indices]
+        train_set = Subset(train_set, indices)
+
+    if batch_mode == "standard":
+        train_loader = DataLoader(train_set, batch_size=BATCH_SIZE, shuffle=True)
+    elif batch_mode == "balanced":
+        num_batches = math.ceil(len(train_set) / BATCH_SIZE)   # same count as the standard loader
+        sampler = BalancedBatchSampler(labels, num_batches, batch_size=BATCH_SIZE, seed=SEED)
+        train_loader = DataLoader(train_set, batch_sampler=sampler)
+    else:
+        raise ValueError(f"unknown batch_mode: {batch_mode}")
     val_loader = DataLoader(val_set, batch_size=BATCH_SIZE, shuffle=False)
     return train_loader, val_loader
+
+
+def file_sha256(path):
+    with open(path, "rb") as f:
+        return hashlib.sha256(f.read()).hexdigest()
 
 
 def run_epoch(model, loader, criterion, optimizer=None):
@@ -156,12 +204,19 @@ def save_history(history, path):
 
 
 def train(run_name, manifest_path, config_path, epochs=EPOCHS, augmentation="none", dropout=DROPOUT,
-          pooling="max", optimizer_name="adam", weight_decay=WEIGHT_DECAY, scheduler_name="none"):
+          pooling="max", optimizer_name="adam", weight_decay=WEIGHT_DECAY, scheduler_name="none",
+          train_subset=None, batch_mode="standard"):
     set_seed()
     REPORTS_DIR.mkdir(exist_ok=True)
     CHECKPOINT_DIR.mkdir(exist_ok=True)
 
-    train_loader, val_loader = build_loaders(manifest_path, config_path, TRAIN_TRANSFORMS[augmentation])
+    train_loader, val_loader = build_loaders(manifest_path, config_path, TRAIN_TRANSFORMS[augmentation],
+                                             train_subset, batch_mode)
+    n_train = len(train_loader.dataset)
+    subset_sha = file_sha256(train_subset) if train_subset is not None else None
+    if train_subset is not None:
+        print(f"train subset {train_subset} (sha256 {subset_sha[:12]}) | {n_train} train images "
+              f"| batch_mode {batch_mode} | {len(train_loader)} batches per epoch")
     print(f"device {DEVICE} | train {len(train_loader.dataset)} | val {len(val_loader.dataset)} "
           f"| augmentation {augmentation} | dropout {dropout} | pooling {pooling} "
           f"| optimizer {optimizer_name} | weight_decay {weight_decay} | scheduler {scheduler_name}")
@@ -181,6 +236,8 @@ def train(run_name, manifest_path, config_path, epochs=EPOCHS, augmentation="non
     checkpoint_path = CHECKPOINT_DIR / f"{run_name}_best.pt"
 
     for epoch in range(1, epochs + 1):
+        if batch_mode == "balanced":
+            train_loader.batch_sampler.set_epoch(epoch)
         train_m = run_epoch(model, train_loader, criterion, optimizer)
         val_m = run_epoch(model, val_loader, criterion)
 
@@ -209,6 +266,10 @@ def train(run_name, manifest_path, config_path, epochs=EPOCHS, augmentation="non
                 "optimizer": optimizer_name,
                 "learning_rate": LEARNING_RATE,
                 "batch_size": BATCH_SIZE,
+                "batch_mode": batch_mode,
+                "train_subset": str(train_subset) if train_subset is not None else None,
+                "train_subset_sha256": subset_sha,
+                "n_train": n_train,
                 "scheduler": scheduler_name,
                 "scheduler_params": SCHEDULER_PARAMS[scheduler_name],
                 "weight_decay": weight_decay,
@@ -249,13 +310,18 @@ def main():
     parser.add_argument("--scheduler", choices=list(SCHEDULER_PARAMS), default="none",
                         help="learning-rate scheduler: none (baseline), step (StepLR 8/0.5), "
                              "plateau (ReduceLROnPlateau on val loss, factor 0.5, patience 3)")
+    parser.add_argument("--train-subset", default=None,
+                        help="CSV of train images to use (e.g. decisions/imbalanced_train.csv); default: full train split")
+    parser.add_argument("--batch-mode", choices=list(BATCH_MODES), default="standard",
+                        help="standard = shuffled batches (baseline), balanced = 4 images per class per batch")
     args = parser.parse_args()
     if not 0.0 <= args.dropout < 1.0:
         parser.error("--dropout must be in [0, 1)")
     if args.weight_decay < 0.0:
         parser.error("--weight-decay must be >= 0")
     train(args.run_name, args.manifest, args.config, args.epochs, args.augmentation, args.dropout,
-          args.pooling, args.optimizer, args.weight_decay, args.scheduler)
+          args.pooling, args.optimizer, args.weight_decay, args.scheduler,
+          args.train_subset, args.batch_mode)
 
 
 if __name__ == "__main__":
