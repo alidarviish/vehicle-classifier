@@ -44,7 +44,7 @@ Sources:
   the re-evaluated macro F1 matches the value stored in each checkpoint and in the history.
 - `baseline`: its checkpoint (epoch 18) was chosen during training with the original folder labels.
   Its final metrics were later recalculated from its saved predictions with the current validation
-  labels (`reports/baseline_result.md`). The two dropout runs chose their checkpoint with the
+  labels (`reports/experiments/00_baseline.md`). The two dropout runs chose their checkpoint with the
   current labels.
 
 ## Per-class metrics (precision / recall / F1, validation)

@@ -57,7 +57,7 @@ Sources:
 - `adamw_wd0`: `reports/adamw_wd0_history.csv` at the best epoch (no separate analysis output).
 - `baseline`: its checkpoint (epoch 18) was chosen during training with the original folder
   labels; its metrics were later recalculated from its saved predictions with the current labels
-  (`reports/baseline_result.md`). The two AdamW runs chose their checkpoint with the current labels.
+  (`reports/experiments/00_baseline.md`). The two AdamW runs chose their checkpoint with the current labels.
 
 ## `adamw_wd1e4` details
 

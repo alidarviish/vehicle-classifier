@@ -56,7 +56,7 @@ Difference from the baseline (both scheduler runs):
 - Until the first rate change, all runs follow the same training: the full history rows of
   `scheduler_step` are identical to those of the fixed-rate control run `adamw_wd0` for epochs 1-8,
   and those of `scheduler_plateau` for epochs 1-9 (`adamw_wd0` reproduced the baseline exactly,
-  see `weight_decay.md`). The train metrics of both runs also equal the baseline history for epochs 1-8.
+  see `04_weight_decay.md`). The train metrics of both runs also equal the baseline history for epochs 1-8.
 - The saved weights in `scheduler_step_best.pt` and `scheduler_plateau_best.pt` are byte-identical.
 - The selected checkpoint of both runs is therefore the epoch-5 model of the same training path
   that the baseline also followed. After the rate was reduced, neither run exceeded the epoch-5

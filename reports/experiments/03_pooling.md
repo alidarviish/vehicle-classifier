@@ -47,7 +47,7 @@ Sources:
   The re-evaluated macro F1 matches the value stored in the checkpoint and in the history.
 - `baseline`: its checkpoint (epoch 18) was chosen during training with the original folder labels;
   its metrics were later recalculated from its saved predictions with the current validation labels
-  (`reports/baseline_result.md`). `pooling_average` chose its checkpoint with the current labels.
+  (`reports/experiments/00_baseline.md`). `pooling_average` chose its checkpoint with the current labels.
 
 ## Per-class metrics for `average` (validation)
 
