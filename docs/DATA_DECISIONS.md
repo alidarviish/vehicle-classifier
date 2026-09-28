@@ -1,0 +1,115 @@
+# Dataset decisions
+
+This file records the dataset decisions that were confirmed during the project, with the
+file that holds the evidence where there is one. Raw images and the dataset itself stay
+outside the repository; only relative paths (`<source>/<split>/<folder>/<file>`) and SHA256
+hashes are recorded here and in `decisions/`.
+
+## Classes and Neysan
+
+- The model has exactly 8 classes: ambulance, autobus, kamyun, kamyunet, minibus, savari, taxi, vanet
+  (`src/dataset.py`, `CLASSES`).
+- Neysan is not a ninth class. It is a subtype of `vanet` (model label `vanet`, subtype `neysan`),
+  confirmed by the professor (`decisions/REVIEW_PROTOCOL.md`).
+- Neysan images are never used for training, validation or Test. They form a separate
+  evaluation set, `neysan_eval`, used only after the model is frozen.
+- A017 (`v1/train/vanet/214726285.jpg`, a modern Nissan / Navara-style pickup) is `vanet`,
+  subtype other, `NOT_NEYSAN` (`decisions/neysan_review.csv`, `decisions/REVIEW_PROTOCOL.md`).
+
+## Dataset statuses
+
+Every image in `data/manifest.csv` (4360 images, v1 + v2) gets exactly one status, applied in this
+order (`scripts/build_statuses.py`):
+
+| Order | Rule | Status | Count |
+|---|---|---|---|
+| 1 | `CONFIRMED_NEYSAN` in `decisions/neysan_review.csv` or `decisions/neysan_test_review.csv` | `neysan_eval` | 371 |
+| 2 | `folder_label == neysan` (policy N1) | `neysan_eval` | 250 |
+| 3 | any other image from `v1/test` | `test_candidate` | 366 |
+| 4 | old drop decision | `excluded` | 47 |
+| 5 | everything else | `train_val_pool` | 3326 |
+
+## Old label_overrides policy
+
+The previous project kept a list of 112 decisions (48 `drop`, 64 `relabel`) in its file
+`CSV/label_overrides.csv` (columns `path, action, new_label, reason`; paths without the
+source prefix, each matching exactly one manifest image).
+
+- Drops are kept: 47 of the 48 dropped images are `excluded`:
+  38 exact or near-duplicates of a v1/test image (Test leakage) and 9 quality / wrong-class images.
+  The 48th drop (`v1/train/vanet/214844236.jpg`, an exact duplicate of
+  `v1/unclean/neysan/214844236.jpg`) is `CONFIRMED_NEYSAN` and goes to `neysan_eval` (rule 1 comes first).
+- The 64 old relabels are NOT applied; pool images keep their `folder_label`
+  (59 kamyun -> kamyunet, 2 savari -> taxi, 1 taxi -> savari, 1 vanet -> savari, 1 ambulance -> vanet).
+
+Source: the list comes from the previous project. A byte-for-byte copy (SHA256 verified against
+the original) is now in this repository as `decisions/old_label_overrides.csv`, and
+`scripts/build_statuses.py` reads it from there; the previous project is no longer needed.
+
+## Human label corrections
+
+After a visual review of baseline validation errors, 8 validation images were relabelled
+(`decisions/kamyun_kamyunet_review.csv`, `decisions/kamyunet_kamyun_review.csv`, rows with a
+`RELABEL_*` decision). `folder_label` is never changed; only the `label` column of the split is.
+
+| Review | Image | folder_label | Final label |
+|---|---|---|---|
+| KK02 | `v1/unclean/kamyun/205437377.jpg` | kamyun | kamyunet |
+| KK03 | `v1/unclean/kamyun/217998174.jpg` | kamyun | kamyunet |
+| KK05 | `v2/train/kamyun/218231967.jpg` | kamyun | kamyunet |
+| KK07 | `v2/train/kamyun/219057756.jpg` | kamyun | kamyunet |
+| KK08 | `v2/unclean/kamyun/213234314.jpg` | kamyun | kamyunet |
+| KK09 | `v2/unclean/kamyun/216456908.jpg` | kamyun | kamyunet |
+| KK10 | `v2/unclean/kamyun/218307800.jpg` | kamyun | kamyunet |
+| KN10 | `v2/train/kamyunet/219017445.jpg` | kamyunet | kamyun |
+
+`KEEP_*` and `UNCERTAIN` decisions (including KN04, still `UNCERTAIN`) do not change labels.
+
+## Test (frozen)
+
+- 400 images, 50 per class (`scripts/build_test.py`).
+- 366 `test_candidate` images: all of v1/test except the 34 images confirmed as Neysan in
+  `decisions/neysan_test_review.csv`, which moved to `neysan_eval`.
+- That left 16 vanet images, so 34 approved vanet replacements were taken from the train/val pool.
+  The approved list and the rule used to choose it are in `scripts/build_test.py`
+  (`APPROVED_REPLACEMENTS`). A017 was deliberately not chosen.
+- Checks at freeze time: no `CONFIRMED_NEYSAN`, no exact duplicate between Test and train/val,
+  no exact duplicate inside Test, no excluded image. The 8 excluded unclean images that are exact
+  copies of Test images stay excluded.
+- Test is used once, for final evaluation. It is not in `data/split_manifest.csv`.
+
+## Train / validation split
+
+- Pool: the 3326 `train_val_pool` images minus the 34 Test replacements = 3292 images
+  (`scripts/make_split.py`).
+- Seed 42, 20% validation, stratified per class (the folder label, as when the split was made),
+  exact-duplicate groups (same SHA256) kept together in one split (15 groups).
+- Result: train 2633, validation 659 (`data/split_manifest.csv`, not tracked).
+- The 8 human label corrections are applied to the `label` column after the split; all 8 are in
+  validation.
+
+## Neysan evaluation (`neysan_eval`)
+
+- 621 images: 371 human-confirmed `CONFIRMED_NEYSAN` (337 from `decisions/neysan_review.csv`,
+  34 from `decisions/neysan_test_review.csv`) and 250 images with `folder_label == neysan`
+  (50 `v1/unclean`, 200 `v2/unclean`), included by policy N1 without an individual human review.
+- By source: v1/test 34, v1/train 36, v1/unclean 84, v2/train 143, v2/unclean 324.
+- One exact-duplicate pair is inside the set: `v1/train/vanet/214844236.jpg` and
+  `v1/unclean/neysan/214844236.jpg`.
+- No `NOT_NEYSAN` and no excluded image is in the set, and none of its images is in train, val or Test.
+
+## Data location
+
+- Raw datasets (v1 `dataset/`, v2 `datasetv2_TrainUclean/`) and all images stay outside the
+  repository; their local paths are in `configs/local_paths.json` (not tracked).
+- `data/manifest.csv` and `data/split_manifest.csv` are generated and not tracked.
+
+## Known reproducibility gaps
+
+The inputs and lists that were missing are now in the repository:
+`decisions/old_label_overrides.csv`, `decisions/test_frozen.csv` (400 images) and
+`decisions/neysan_eval.csv` (621 images). The one remaining gap is outside the repository:
+
+- The local snapshot outside the repository (`vehicle-classifier-dataset/` and its zip) no longer
+  contains `snapshot_manifest.csv`, so its files are only traceable through their names
+  (`<source>_<origin_split>_<file>`).

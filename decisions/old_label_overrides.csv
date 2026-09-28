@@ -1,0 +1,113 @@
+path,action,new_label,reason
+train/taxi/218268791.jpg,drop,,police car mistakenly included in taxi class (confirmed by visual review)
+unclean/minibus/218724931.jpg,drop,,only a flat metal roof visible from directly above; does not resemble a minibus; closer to a truck cargo bed cover; too ambiguous to keep
+unclean/kamyun/205437377.jpg,relabel,kamyunet,confirmed by manual visual review: labeled kamyun but vehicle visually matches kamyunet
+unclean/kamyun/218576473.jpg,relabel,kamyunet,confirmed by manual visual review: labeled kamyun but vehicle visually matches kamyunet
+unclean/kamyun/217998174.jpg,relabel,kamyunet,confirmed by manual visual review: labeled kamyun but vehicle visually matches kamyunet
+unclean/kamyun/218562521.jpg,relabel,kamyunet,confirmed by manual visual review: labeled kamyun but vehicle visually matches kamyunet
+unclean/kamyun/218755560.jpg,relabel,kamyunet,confirmed by manual visual review: labeled kamyun but vehicle visually matches kamyunet
+train/kamyun/214831926.jpg,relabel,kamyunet,confirmed by manual visual review: labeled kamyun but vehicle visually matches kamyunet
+unclean/kamyun/216212208.jpg,relabel,kamyunet,confirmed by manual visual review: labeled kamyun but vehicle visually matches kamyunet
+train/kamyun/216847004.jpg,relabel,kamyunet,confirmed by manual visual review: labeled kamyun but vehicle visually matches kamyunet
+train/vanet/214844236.jpg,drop,,exact pixel duplicate of unclean/neysan/214844236.jpg (now merged into vanet too via FOLDER_TO_LABEL); keep one copy only; carried over from the old split.py exclusion
+unclean/minibus/218138154.jpg,drop,,exact pixel duplicate of test/minibus/218138154.jpg; would leak into training if kept
+unclean/minibus/218307381.jpg,drop,,exact pixel duplicate of test/minibus/218307381.jpg; would leak into training if kept
+unclean/ambulance/215713763.jpg,drop,,exact pixel duplicate of test/ambulance/215713763.jpg; would leak into training if kept
+unclean/ambulance/218089422.jpg,drop,,exact pixel duplicate of test/ambulance/218089422.jpg; would leak into training if kept
+unclean/ambulance/200396165.jpg,drop,,exact pixel duplicate of test/ambulance/200396165.jpg; would leak into training if kept
+unclean/ambulance/214830125.jpg,drop,,exact pixel duplicate of test/ambulance/214830125.jpg; would leak into training if kept
+unclean/ambulance/217040489.jpg,drop,,exact pixel duplicate of test/ambulance/217040489.jpg; would leak into training if kept
+unclean/ambulance/216095686.jpg,drop,,exact pixel duplicate of test/ambulance/216095686.jpg; would leak into training if kept
+train/autobus/216079914.jpg,drop,,near-duplicate (phash distance 2) of test/autobus/214795472.jpg; would leak into training if kept
+train/autobus/218028985.jpg,drop,,near-duplicate (phash distance 2-4) of test/autobus/217008397.jpg and test/autobus/217020493.jpg; would leak into training if kept
+train/minibus/215607636.jpg,drop,,near-duplicate (phash distance 2-4) of test/minibus/218307381.jpg and test/minibus/218328619.jpg; would leak into training if kept
+train/minibus/218596879.jpg,drop,,near-duplicate (phash distance 2) of test/minibus/218307381.jpg; would leak into training if kept
+unclean/minibus/216430711.jpg,drop,,near-duplicate (phash distance 4) of test/minibus/216249951.jpg; would leak into training if kept
+unclean/minibus/215772703.jpg,drop,,near-duplicate (phash distance 2-4) of test/minibus/218307381.jpg and test/minibus/218328619.jpg; would leak into training if kept
+unclean/minibus/215917000.jpg,drop,,near-duplicate (phash distance 2) of test/minibus/218307381.jpg; would leak into training if kept
+unclean/minibus/216061853.jpg,drop,,near-duplicate (phash distance 2) of test/minibus/218605367.jpg; would leak into training if kept
+train/kamyun/215989939.jpg,relabel,kamyunet,"confirmed by user visual review (resnet_finetune_v2 misclassification audit): labeled kamyun but vehicle visually matches kamyunet"
+unclean/kamyun/216850292.jpg,relabel,kamyunet,"confirmed by user visual review (resnet_finetune_v2 misclassification audit): labeled kamyun but vehicle visually matches kamyunet, no resemblance to ambulance either"
+unclean/minibus/215870097.jpg,drop,,"too tightly cropped to identify confidently (confirmed by user visual review)"
+train/autobus/213748478.jpg,drop,,near-duplicate (phash distance 4) of test/autobus/214795472.jpg; v4_combined_pool test-leakage check; would leak into training if kept
+train/autobus/217431762.jpg,drop,,near-duplicate (phash distance 4) of test/autobus/214795472.jpg; v4_combined_pool test-leakage check; would leak into training if kept
+train/autobus/218060991.jpg,drop,,near-duplicate (phash distance 4) of test/autobus/217020493.jpg; v4_combined_pool test-leakage check; would leak into training if kept
+train/autobus/218903278.jpg,drop,,near-duplicate (phash distance 2) of test/autobus/215678079.jpg; v4_combined_pool test-leakage check; would leak into training if kept
+train/minibus/215859419.jpg,drop,,near-duplicate (phash distance 4) of test/minibus/218307381.jpg; v4_combined_pool test-leakage check; would leak into training if kept
+train/minibus/216539402.jpg,drop,,near-duplicate (phash distance 4) of test/minibus/217234709.jpg; v4_combined_pool test-leakage check; would leak into training if kept
+train/minibus/218321697.jpg,drop,,near-duplicate (phash distance 4) of test/minibus/218605367.jpg; v4_combined_pool test-leakage check; would leak into training if kept
+train/taxi/218343681.jpg,drop,,near-duplicate (phash distance 4) of test/taxi/218164022.jpg; v4_combined_pool test-leakage check; would leak into training if kept
+train/taxi/218787302.jpg,drop,,near-duplicate (phash distance 2) of test/taxi/218713530.jpg; v4_combined_pool test-leakage check; would leak into training if kept
+unclean/autobus/216269810.jpg,drop,,near-duplicate (phash distance 4) of test/autobus/214795472.jpg; v4_combined_pool test-leakage check; would leak into training if kept
+unclean/autobus/216036079.jpg,drop,,near-duplicate (phash distance 4) of test/autobus/216169926.jpg; v4_combined_pool test-leakage check; would leak into training if kept
+unclean/autobus/218434288.jpg,drop,,near-duplicate (phash distance 4) of test/autobus/217948652.jpg; v4_combined_pool test-leakage check; would leak into training if kept
+unclean/minibus/216317074.jpg,drop,,near-duplicate (phash distance 4) of test/minibus/216241825.jpg; v4_combined_pool test-leakage check; would leak into training if kept
+unclean/minibus/218707170.jpg,drop,,near-duplicate (phash distance 4) of test/minibus/216737437.jpg; v4_combined_pool test-leakage check; would leak into training if kept
+unclean/minibus/216573266.jpg,drop,,near-duplicate (phash distance 2-4) of test/minibus/218307381.jpg and test/minibus/218328619.jpg; v4_combined_pool test-leakage check; would leak into training if kept
+unclean/minibus/218252019.jpg,drop,,near-duplicate (phash distance 4) of test/minibus/218307381.jpg; v4_combined_pool test-leakage check; would leak into training if kept
+unclean/minibus/218892957.jpg,drop,,near-duplicate (phash distance 4) of test/minibus/218307381.jpg; v4_combined_pool test-leakage check; would leak into training if kept
+unclean/minibus/218982546.jpg,drop,,near-duplicate (phash distance 4) of test/minibus/218328619.jpg; v4_combined_pool test-leakage check; would leak into training if kept
+unclean/minibus/216051293.jpg,drop,,near-duplicate (phash distance 4) of test/minibus/218605367.jpg; v4_combined_pool test-leakage check; would leak into training if kept
+unclean/savari/215184231.jpg,drop,,near-duplicate (phash distance 4) of test/savari/218429844.jpg; v4_combined_pool test-leakage check; would leak into training if kept
+unclean/taxi/216608752.jpg,drop,,near-duplicate (phash distance 4) of test/taxi/215165181.jpg; v4_combined_pool test-leakage check; would leak into training if kept
+unclean/taxi/214543438.jpg,drop,,near-duplicate (phash distance 4) of test/taxi/218713530.jpg; v4_combined_pool test-leakage check; would leak into training if kept
+unclean/kamyun/218307800.jpg,relabel,kamyunet,confirmed by user visual review (v4_combined_pool audit): labeled kamyun but vehicle visually matches kamyunet
+train/kamyun/206174596.jpg,relabel,kamyunet,confirmed by user visual review (v4_combined_pool audit): labeled kamyun but vehicle visually matches kamyunet
+train/kamyun/217219987.jpg,relabel,kamyunet,confirmed by user visual review (v4_combined_pool audit): labeled kamyun but vehicle visually matches kamyunet
+unclean/kamyun/215697977.jpg,relabel,kamyunet,confirmed by user visual review (v4_combined_pool audit): labeled kamyun but vehicle visually matches kamyunet
+unclean/kamyun/217273409.jpg,relabel,kamyunet,confirmed by user visual review (v4_combined_pool audit): labeled kamyun but vehicle visually matches kamyunet
+unclean/kamyun/214646142.jpg,relabel,kamyunet,confirmed by user visual review (v4_combined_pool audit): labeled kamyun but vehicle visually matches kamyunet
+train/kamyun/216008162.jpg,relabel,kamyunet,confirmed by user visual review (v4_combined_pool audit): labeled kamyun but vehicle visually matches kamyunet
+train/kamyun/216561920.jpg,relabel,kamyunet,confirmed by user visual review (v4_combined_pool audit): labeled kamyun but vehicle visually matches kamyunet
+train/kamyun/216293604.jpg,relabel,kamyunet,confirmed by user visual review (v4_combined_pool audit): labeled kamyun but vehicle visually matches kamyunet
+unclean/kamyun/194484076.jpg,relabel,kamyunet,confirmed by user visual review (v4_combined_pool audit): labeled kamyun but vehicle visually matches kamyunet
+train/kamyun/215721968.jpg,relabel,kamyunet,confirmed by user visual review (v4_combined_pool audit): labeled kamyun but vehicle visually matches kamyunet
+train/kamyun/214657348.jpg,relabel,kamyunet,confirmed by user visual review (v4_combined_pool audit): labeled kamyun but vehicle visually matches kamyunet
+unclean/kamyun/213234314.jpg,relabel,kamyunet,confirmed by user visual review (v4_combined_pool audit): labeled kamyun but vehicle visually matches kamyunet
+train/kamyun/216048837.jpg,relabel,kamyunet,confirmed by user visual review (v4_combined_pool audit): labeled kamyun but vehicle visually matches kamyunet
+train/kamyun/219057756.jpg,relabel,kamyunet,confirmed by user visual review (v4_combined_pool audit): labeled kamyun but vehicle visually matches kamyunet
+train/kamyun/219002808.jpg,relabel,kamyunet,confirmed by user visual review (v4_combined_pool audit): labeled kamyun but vehicle visually matches kamyunet
+train/kamyun/216039996.jpg,relabel,kamyunet,confirmed by user visual review (v4_combined_pool audit): labeled kamyun but vehicle visually matches kamyunet
+train/kamyun/218906168.jpg,relabel,kamyunet,confirmed by user visual review (v4_combined_pool audit): labeled kamyun but vehicle visually matches kamyunet
+unclean/kamyun/194280486.jpg,relabel,kamyunet,confirmed by user visual review (v4_combined_pool audit): labeled kamyun but vehicle visually matches kamyunet
+unclean/kamyun/216393221.jpg,relabel,kamyunet,confirmed by user visual review (v4_combined_pool audit): labeled kamyun but vehicle visually matches kamyunet
+unclean/kamyun/216616423.jpg,relabel,kamyunet,confirmed by user visual review (v4_combined_pool audit): labeled kamyun but vehicle visually matches kamyunet - model predicted ambulance but no ambulance markings visible
+train/kamyun/217341470.jpg,relabel,kamyunet,confirmed by user visual review (v4_combined_pool audit): labeled kamyun but vehicle visually matches kamyunet
+unclean/kamyun/217967481.jpg,relabel,kamyunet,confirmed by user visual review (v4_combined_pool audit): labeled kamyun but vehicle visually matches kamyunet
+unclean/kamyun/216596453.jpg,relabel,kamyunet,confirmed by user visual review (v4_combined_pool audit): labeled kamyun but vehicle visually matches kamyunet - night photo confirmed by user
+train/kamyun/216026504.jpg,relabel,kamyunet,confirmed by user visual review (v4_combined_pool audit): labeled kamyun but vehicle visually matches kamyunet
+train/kamyun/218827750.jpg,relabel,kamyunet,confirmed by user visual review (v4_combined_pool audit): labeled kamyun but vehicle visually matches kamyunet
+train/kamyun/216984093.jpg,relabel,kamyunet,confirmed by user visual review (v4_combined_pool audit): labeled kamyun but vehicle visually matches kamyunet
+train/kamyun/199172201.jpg,relabel,kamyunet,confirmed by user visual review (v4_combined_pool audit): labeled kamyun but vehicle visually matches kamyunet
+train/kamyun/219095831.jpg,relabel,kamyunet,confirmed by user visual review (v4_combined_pool audit): labeled kamyun but vehicle visually matches kamyunet
+unclean/ambulance/200420286.jpg,relabel,vanet,confirmed by user visual review (v4_combined_pool audit): plain pickup with empty cargo rack; no ambulance markings/lights visible; matches vanet not ambulance
+train/savari/203730891.jpg,relabel,taxi,confirmed by user visual review (v4_combined_pool audit): yellow body color matches Iranian taxi standard color not private savari
+train/savari/206803325.jpg,relabel,taxi,confirmed by user visual review (v4_combined_pool audit): yellow body color matches Iranian taxi standard color not private savari
+train/taxi/218147453.jpg,drop,,confirmed by user visual review (v4_combined_pool audit): police car mistakenly included in taxi class same issue as previously known 218268791 case
+unclean/taxi/217605723.jpg,relabel,savari,confirmed by user visual review (v4_combined_pool audit): boxed vehicle is a plain white car with no taxi markings; the actual taxi visible at frame edge is a separate image
+unclean/ambulance/214536826.jpg,drop,,confirmed by user visual review (v4_combined_pool audit): off-road vehicle mistakenly included in ambulance class no ambulance markings and does not fit any of the 8 taxonomy classes
+unclean/ambulance/218786704.jpg,drop,,confirmed by user visual review (v4_combined_pool audit): off-road vehicle mistakenly included in ambulance class no ambulance markings and does not fit any of the 8 taxonomy classes
+train/kamyun/216835885.jpg,relabel,kamyunet,small cab-over kamyunet-scale truck (v4_combined_pool audit round2)
+unclean/kamyun/216972904.jpg,relabel,kamyunet,small cab-over kamyunet-scale truck (v4_combined_pool audit round2)
+train/kamyun/216977256.jpg,relabel,kamyunet,small cab-over kamyunet-scale truck (v4_combined_pool audit round2)
+unclean/kamyun/217031763.jpg,relabel,kamyunet,small cab-over kamyunet-scale truck (v4_combined_pool audit round2)
+train/kamyun/217067503.jpg,relabel,kamyunet,small cab-over kamyunet-scale truck (v4_combined_pool audit round2)
+train/kamyun/216830421.jpg,relabel,kamyunet,small cab-over kamyunet-scale truck (v4_combined_pool audit round2)
+unclean/kamyun/216456908.jpg,relabel,kamyunet,small cab-over kamyunet-scale truck (v4_combined_pool audit round2)
+train/kamyun/218231967.jpg,relabel,kamyunet,small cab-over kamyunet-scale truck (v4_combined_pool audit round2)
+unclean/kamyun/218578650.jpg,relabel,kamyunet,small cab-over kamyunet-scale truck (v4_combined_pool audit round2)
+unclean/kamyun/218685223.jpg,relabel,kamyunet,small cab-over kamyunet-scale truck (v4_combined_pool audit round2)
+unclean/kamyun/218699915.jpg,relabel,kamyunet,small cab-over kamyunet-scale truck (v4_combined_pool audit round2)
+train/kamyun/218719693.jpg,relabel,kamyunet,small cab-over kamyunet-scale truck (v4_combined_pool audit round2)
+train/kamyun/218935445.jpg,relabel,kamyunet,small cab-over kamyunet-scale truck (v4_combined_pool audit round2)
+train/kamyun/218936367.jpg,relabel,kamyunet,small cab-over kamyunet-scale truck (v4_combined_pool audit round2)
+unclean/kamyun/217309460.jpg,relabel,kamyunet,small cab-over kamyunet-scale truck (v4_combined_pool audit round2)
+unclean/kamyun/217892920.jpg,relabel,kamyunet,small cab-over kamyunet-scale truck (v4_combined_pool audit round2)
+unclean/kamyun/219062079.jpg,relabel,kamyunet,small cab-over kamyunet-scale truck (v4_combined_pool audit round2)
+train/minibus/205763607.jpg,drop,,near-empty crop mostly guardrail barely any vehicle visible (v4_combined_pool audit round2)
+unclean/minibus/214541786.jpg,drop,,near-empty crop only roof visible large blank area no identifying features (v4_combined_pool audit round2)
+train/taxi/216191824.jpg,drop,,police plate visible plain sedan not a real taxi (v4_combined_pool audit round2)
+unclean/vanet/209939482.jpg,relabel,savari,SUV body no pickup bed not a vanet (v4_combined_pool audit round2)
+unclean/kamyun/200457547.jpg,relabel,kamyunet,small cab-over kamyunet-scale truck (v4_combined_pool audit round2 val)
+unclean/kamyun/209859136.jpg,relabel,kamyunet,small cab-over kamyunet-scale truck (v4_combined_pool audit round2 val)
+unclean/kamyun/215816828.jpg,relabel,kamyunet,small cab-over kamyunet-scale truck night (v4_combined_pool audit round2 val)
