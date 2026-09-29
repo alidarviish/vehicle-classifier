@@ -109,6 +109,21 @@ class is kamyunet, due to 12 kamyunet -> kamyun errors. It is kept regardless of
 single run with seed 42 and is not general evidence about the effect of this combination. See
 `experiments/08_resnet.md`.
 
+## Final model selection
+
+Selected on validation only (see [10_final_model_selection.md](experiments/10_final_model_selection.md)):
+**`resnet224_ft_aug`**, checkpoint `checkpoints/resnet224_ft_aug_best.pt` (epoch 20). Its validation
+results are accuracy 0.9605, macro precision 0.9456, macro recall 0.9523 and macro F1 0.9482; it has
+the highest macro F1 of all runs. Known weaknesses are vanet (F1 0.8214, precision 0.7667) and the
+kamyun / kamyunet confusion. The test set has not been evaluated yet and was not used for this
+selection.
+
+Chosen `needs_review` threshold (validation only, see
+[11_needs_review_threshold.md](experiments/11_needs_review_threshold.md)): **0.90**. A prediction
+whose confidence is below 0.90 gets a human-review flag; nothing is rejected. On validation this
+flags 35 of 659 images, 13 of the 26 errors and 22 correct predictions, and leaves coverage at 94.7%.
+The test set has not been used.
+
 ## Other folders
 
 - `audit/`: initial dataset audit (counts and exact duplicates).
