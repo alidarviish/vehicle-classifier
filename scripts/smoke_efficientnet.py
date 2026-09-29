@@ -102,6 +102,47 @@ empty = E.build_efficientnet_b0(num_classes=8, pretrained=False)
 check("pretrained=False: same state_dict keys and shapes",
       {k: tuple(v.shape) for k, v in empty.state_dict().items()} == {k: tuple(v.shape) for k, v in model.state_dict().items()})
 
+# 5b. fine-tuning: features[6:9] unfrozen, features[0:6] stay frozen and in eval mode
+ft = E.build_efficientnet_b0(num_classes=8, pretrained=True)
+top = sum(p.numel() for i in E.UNFREEZE_STAGES for p in ft.net.features[i].parameters())
+low = sum(p.numel() for i in range(6) for p in ft.net.features[i].parameters())
+before = E.count_params(ft)
+check("UNFREEZE_STAGES == (6, 7, 8)", E.UNFREEZE_STAGES == (6, 7, 8))
+check("fine-tuning, before unfreeze: trainable 10,248 (classifier), frozen = all of net.features",
+      before == (10248, low + top), f"trainable {before[0]:,} | frozen {before[1]:,}")
+E.unfreeze_top_stages(ft)
+after = E.count_params(ft)
+print(f"fine-tuning: before unfreeze trainable {before[0]:,} / frozen {before[1]:,} | "
+      f"after unfreeze trainable {after[0]:,} / frozen {after[1]:,} | features[6:9] {top:,} | features[0:6] {low:,}")
+check("after unfreeze: trainable = classifier + features[6:9], frozen = features[0:6]",
+      after == (10248 + top, low), f"trainable {after[0]:,} | frozen {after[1]:,}")
+check("top_stage_parameters() = the parameters of features[6:9]",
+      sum(p.numel() for p in E.top_stage_parameters(ft)) == top)
+check("trainable_parts after unfreeze == ['features.6', 'features.7', 'features.8', 'classifier']",
+      E.trainable_parts(ft) == ["features.6", "features.7", "features.8", "classifier"], str(E.trainable_parts(ft)))
+ft.train()
+check("model.train(): features[0:6] (all submodules: BatchNorm, stochastic depth) stay in eval",
+      all(not m.training for i in range(6) for m in ft.net.features[i].modules()))
+check("model.train(): features[6:9] (all submodules) in train mode",
+      all(m.training for i in E.UNFREEZE_STAGES for m in ft.net.features[i].modules()))
+check("model.train(): classifier in train mode", ft.net.classifier.training)
+torch.manual_seed(0)
+opt_ft = torch.optim.Adam([{"params": list(ft.net.classifier.parameters()), "lr": T.EFFNET_HEAD_LR},
+                           {"params": E.top_stage_parameters(ft), "lr": T.EFFNET_TOP_LR}])
+low_before = {k: v.clone() for k, v in ft.net.features[:6].state_dict().items()}
+top_before = {k: v.clone() for k, v in ft.net.features[6:].state_dict().items()}
+loss = nn.CrossEntropyLoss()(ft(torch.randn(4, 3, 224, 224)), torch.tensor([0, 1, 2, 7]))
+opt_ft.zero_grad(); loss.backward(); opt_ft.step()
+check("one step (fine-tuning): features[0:6] weights AND BatchNorm running stats unchanged",
+      all(torch.equal(low_before[k], v) for k, v in ft.net.features[:6].state_dict().items()))
+top_after = ft.net.features[6:].state_dict()
+check("one step (fine-tuning): features[6:9] weights changed",
+      any(not torch.equal(top_before[k], v) for k, v in top_after.items() if "running" not in k and "num_batches" not in k))
+check("one step (fine-tuning): BatchNorm running stats of features[6:9] updated (train mode)",
+      any(not torch.equal(top_before[k], v) for k, v in top_after.items() if "running_mean" in k))
+ft.eval()
+check("model.eval() (fine-tuning): everything in eval mode", all(not m.training for m in ft.modules()))
+
 
 # 6. CLI guards (train() is replaced by a stub, nothing is trained or written)
 def cli(argv):
@@ -138,6 +179,21 @@ status, _ = cli(["--run-name", "x", "--model", "resnet18"])
 check("regression: resnet18 without --resnet-mode still rejected", status.startswith("rejected"), status)
 status, _ = cli(["--run-name", "x", "--model", "resnet18", "--resnet-mode", "fine_tuning", "--augmentation", "full_aug"])
 check("regression: resnet18 fine_tuning + full_aug still accepted", status == "ok", status)
+status, args = cli(["--run-name", "effnet_b0_ft_none", *eff, "--effnet-mode", "fine_tuning"])
+check("CLI efficientnet_b0 --effnet-mode fine_tuning accepted (augmentation none, effnet_mode fine_tuning)",
+      status == "ok" and args is not None and args[4] == "none" and args[13] == "efficientnet_b0"
+      and args[15] == "fine_tuning", status)
+status, args = cli(["--run-name", "effnet_b0_fe_none", *eff])
+check("CLI efficientnet_b0 without --effnet-mode -> feature_extraction",
+      status == "ok" and args is not None and args[15] == "feature_extraction", status)
+for label, argv in [
+    ("--effnet-mode with resnet18", ["--run-name", "x", "--model", "resnet18", "--resnet-mode", "fine_tuning",
+                                     "--effnet-mode", "fine_tuning"]),
+    ("--effnet-mode with baseline", ["--run-name", "x", "--effnet-mode", "fine_tuning"]),
+    ("--effnet-mode with an unknown value", ["--run-name", "effnet_b0_x", *eff, "--effnet-mode", "full"]),
+]:
+    status, _ = cli(argv)
+    check(f"CLI rejects {label}", status.startswith("rejected"), status)
 
 
 # 7. train(): overwrite / name guards and the transforms it passes on (stopped before any training)
@@ -169,6 +225,20 @@ with tempfile.TemporaryDirectory() as tmp:
             pass
         check("train() uses RESNET_TRAIN_TRANSFORMS['full_aug'] for train and RESNET_TRANSFORM for val",
               seen.get("train") is T.RESNET_TRAIN_TRANSFORMS["full_aug"] and seen.get("val") is T.RESNET_TRANSFORM)
+        seen.clear()
+        try:
+            T.train("effnet_b0_ft_none", T.DEFAULT_MANIFEST, T.DEFAULT_CONFIG, augmentation="none",
+                    model_name="efficientnet_b0", effnet_mode="fine_tuning")
+        except Stop:
+            pass
+        check("train() fine_tuning + augmentation none uses RESNET_TRANSFORM for train and val",
+              seen.get("train") is T.RESNET_TRANSFORM and seen.get("val") is T.RESNET_TRANSFORM)
+        try:
+            T.train("effnet_b0_x", T.DEFAULT_MANIFEST, T.DEFAULT_CONFIG, model_name="efficientnet_b0",
+                    effnet_mode="partial")
+            check("train() rejects an unknown effnet_mode", False)
+        except ValueError:
+            check("train() rejects an unknown effnet_mode", True)
         T.CHECKPOINT_DIR.mkdir(parents=True, exist_ok=True)
         (T.CHECKPOINT_DIR / "effnet_b0_fe_aug_best.pt").write_bytes(b"x")
         try:
@@ -179,6 +249,54 @@ with tempfile.TemporaryDirectory() as tmp:
             check("train() refuses to overwrite an existing checkpoint", True)
     finally:
         T.REPORTS_DIR, T.CHECKPOINT_DIR, T.build_loaders = real_reports, real_ckpt, real_loaders
+
+# 7b. train(): warm-up schedule, history and checkpoint metadata, with build_loaders and run_epoch
+#     replaced by stubs (synthetic tensors, no real training, no image read, files only in a temporary folder)
+from torch.utils.data import DataLoader, TensorDataset
+
+
+def tiny_loaders(manifest, config, train_tf, subset, batch_mode, val_tf):
+    ds = TensorDataset(torch.randn(2, 3, 224, 224), torch.tensor([0, 1]))
+    return DataLoader(ds, batch_size=2), DataLoader(ds, batch_size=2)
+
+
+calls = {"n": 0}
+
+
+def fake_epoch(model, loader, criterion, optimizer=None, loss_name="ce"):
+    calls["n"] += 1
+    f1 = calls["n"] / 1000   # strictly increasing, so a checkpoint is written every epoch
+    return {"loss": 1.0, "accuracy": f1, "precision": f1, "recall": f1, "f1": f1}
+
+
+real_reports, real_ckpt, real_loaders, real_epoch = T.REPORTS_DIR, T.CHECKPOINT_DIR, T.build_loaders, T.run_epoch
+with tempfile.TemporaryDirectory() as tmp:
+    T.REPORTS_DIR, T.CHECKPOINT_DIR = Path(tmp) / "reports", Path(tmp) / "checkpoints"
+    T.build_loaders, T.run_epoch = tiny_loaders, fake_epoch
+    try:
+        hist = T.train("effnet_b0_ft_smoke", T.DEFAULT_MANIFEST, T.DEFAULT_CONFIG, epochs=6,
+                       model_name="efficientnet_b0", effnet_mode="fine_tuning")
+        ck = torch.load(T.CHECKPOINT_DIR / "effnet_b0_ft_smoke_best.pt", map_location="cpu", weights_only=True)
+        tp = [r["trainable_params"] for r in hist]
+        check("history trainable_params: 10,248 in epochs 1-5, classifier + features[6:9] from epoch 6",
+              tp == [10248] * 5 + [10248 + top], str(tp))
+        check("checkpoint metadata (fine_tuning): mode, warm-up, unfrozen stages, parts, counts, lr groups",
+              ck["architecture"] == "EfficientNet-B0" and ck["effnet_mode"] == "fine_tuning" and ck["warmup_epochs"] == 5
+              and ck["unfrozen_stages"] == [6, 7, 8] and ck["epoch"] == 6
+              and ck["trainable_parts"] == ["features.6", "features.7", "features.8", "classifier"]
+              and ck["trainable_params"] == 10248 + top and ck["frozen_params"] == low
+              and ck["param_group_lrs"] == {"classifier": 1e-3, "features.6-8": 1e-4}
+              and ck["transform"]["augmentation"] == "none",
+              str({k: ck[k] for k in ("effnet_mode", "warmup_epochs", "unfrozen_stages", "trainable_parts",
+                                      "trainable_params", "frozen_params", "param_group_lrs")}))
+        hist = T.train("effnet_b0_fe_smoke", T.DEFAULT_MANIFEST, T.DEFAULT_CONFIG, epochs=2, model_name="efficientnet_b0")
+        ck = torch.load(T.CHECKPOINT_DIR / "effnet_b0_fe_smoke_best.pt", map_location="cpu", weights_only=True)
+        check("checkpoint metadata (feature_extraction, the default) unchanged",
+              ck["effnet_mode"] == "feature_extraction" and ck["warmup_epochs"] is None and ck["unfrozen_stages"] is None
+              and ck["trainable_parts"] == ["classifier"] and ck["trainable_params"] == 10248
+              and ck["param_group_lrs"] == {"classifier": 1e-3} and [r["trainable_params"] for r in hist] == [10248, 10248])
+    finally:
+        T.REPORTS_DIR, T.CHECKPOINT_DIR, T.build_loaders, T.run_epoch = real_reports, real_ckpt, real_loaders, real_epoch
 
 # 8. one real batch of train and validation with the EfficientNet transforms (no Test / Neysan)
 test_sha = {r["sha256"] for r in csv.DictReader(open(TEST_CSV, encoding="utf-8"))}

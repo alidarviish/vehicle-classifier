@@ -5,6 +5,7 @@ Run from the repository root:
     python -m src.train --config configs/local_paths.json
     python -m src.train --run-name resnet_feature_extraction --model resnet18 --resnet-mode feature_extraction
     python -m src.train --run-name effnet_b0_fe_aug --model efficientnet_b0 --augmentation full_aug
+    python -m src.train --run-name effnet_b0_ft_none --model efficientnet_b0 --effnet-mode fine_tuning
 
 Only the "train" and "val" rows of data/split_manifest.csv are used.
 The test set is not read anywhere in this file.
@@ -141,11 +142,15 @@ RESNET_HEAD_LR = LEARNING_RATE   # new 8-class head (fc), 1e-3
 RESNET_LAYER4_LR = 1e-4          # pretrained layer4, 10x smaller
 FT_WARMUP_EPOCHS = 5             # fine-tuning: fc only in epochs 1-5, layer4 unfrozen from epoch 6
 
-# EfficientNet-B0: separate comparison experiment (src/efficientnet.py), feature extraction only.
+# EfficientNet-B0: separate comparison experiment (src/efficientnet.py).
 # It uses the same 224x224 input, ImageNet normalization and train transforms as ResNet18, and the
-# same head learning rate. Its run names must start with EFFNET_RUN_PREFIX and it never overwrites
-# an existing checkpoint or history, so the ResNet18 artifacts (incl. the final model) are never touched.
+# same learning rates and warm-up as ResNet18 fine-tuning. Its run names must start with EFFNET_RUN_PREFIX
+# and it never overwrites an existing checkpoint or history, so the ResNet18 artifacts (incl. the final
+# model) are never touched.
+EFFNET_MODES = ("feature_extraction", "fine_tuning")
 EFFNET_HEAD_LR = LEARNING_RATE   # new 8-class classifier, 1e-3 (same as RESNET_HEAD_LR)
+EFFNET_TOP_LR = 1e-4             # pretrained features[6:9] in fine-tuning, 10x smaller (same as RESNET_LAYER4_LR)
+EFFNET_TOP_GROUP = "features.6-8"
 EFFNET_RUN_PREFIX = "effnet_b0_"
 
 DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -274,10 +279,12 @@ def save_history(history, path):
 def train(run_name, manifest_path, config_path, epochs=EPOCHS, augmentation="none", dropout=DROPOUT,
           pooling="max", optimizer_name="adam", weight_decay=WEIGHT_DECAY, scheduler_name="none",
           train_subset=None, batch_mode="standard", loss_name="ce", model_name="baseline",
-          resnet_mode=None):
+          resnet_mode=None, effnet_mode="feature_extraction"):
     is_resnet = model_name == "resnet18"
     is_effnet = model_name == "efficientnet_b0"
     if is_effnet:
+        if effnet_mode not in EFFNET_MODES:
+            raise ValueError(f"effnet_mode must be one of {EFFNET_MODES}, got '{effnet_mode}'")
         if not run_name.startswith(EFFNET_RUN_PREFIX):
             raise ValueError(f"EfficientNet-B0 run names must start with '{EFFNET_RUN_PREFIX}', got '{run_name}'")
         existing = [p for p in (CHECKPOINT_DIR / f"{run_name}_best.pt", REPORTS_DIR / f"{run_name}_history.csv")
@@ -321,12 +328,18 @@ def train(run_name, manifest_path, config_path, epochs=EPOCHS, augmentation="non
               + (f" | layer4 unfrozen from epoch {FT_WARMUP_EPOCHS + 1}" if resnet_mode == "fine_tuning" else ""))
     elif is_effnet:
         model = efficientnet.build_efficientnet_b0(num_classes=len(CLASSES)).to(DEVICE)   # features frozen
+        # classifier from epoch 1; in fine-tuning the features[6:9] group is in the optimizer from the start,
+        # but its parameters have no gradient (frozen) until epoch 6, so the optimizer skips them
         group_lrs = {"classifier": EFFNET_HEAD_LR}
         param_groups = [{"params": list(model.net.classifier.parameters()), "lr": EFFNET_HEAD_LR}]
+        if effnet_mode == "fine_tuning":
+            group_lrs[EFFNET_TOP_GROUP] = EFFNET_TOP_LR
+            param_groups.append({"params": efficientnet.top_stage_parameters(model), "lr": EFFNET_TOP_LR})
         optimizer = OPTIMIZERS[optimizer_name](param_groups, weight_decay=weight_decay)
         trainable, frozen = efficientnet.count_params(model)
-        print(f"model efficientnet_b0 ({efficientnet.PRETRAINED_WEIGHTS}) | mode feature_extraction "
-              f"| head {model.net.classifier} | trainable {trainable:,} | frozen {frozen:,} | lr per group {group_lrs}")
+        print(f"model efficientnet_b0 ({efficientnet.PRETRAINED_WEIGHTS}) | mode {effnet_mode} "
+              f"| head {model.net.classifier} | trainable {trainable:,} | frozen {frozen:,} | lr per group {group_lrs}"
+              + (f" | features[6:9] unfrozen from epoch {FT_WARMUP_EPOCHS + 1}" if effnet_mode == "fine_tuning" else ""))
     else:
         model = BaselineCNN(num_classes=len(CLASSES), image_size=IMAGE_SIZE, dropout=dropout,
                             pooling=pooling).to(DEVICE)
@@ -348,6 +361,10 @@ def train(run_name, manifest_path, config_path, epochs=EPOCHS, augmentation="non
             unfreeze_layer4(model)
             trainable, frozen = count_params(model)
             print(f"epoch {epoch}: layer4 unfrozen | trainable {trainable:,} | frozen {frozen:,}")
+        if is_effnet and effnet_mode == "fine_tuning" and epoch == FT_WARMUP_EPOCHS + 1:
+            efficientnet.unfreeze_top_stages(model)
+            trainable, frozen = efficientnet.count_params(model)
+            print(f"epoch {epoch}: features[6:9] unfrozen | trainable {trainable:,} | frozen {frozen:,}")
         train_m = run_epoch(model, train_loader, criterion, optimizer, loss_name=loss_name)
         val_m = run_epoch(model, val_loader, criterion, loss_name=loss_name)
 
@@ -419,7 +436,9 @@ def train(run_name, manifest_path, config_path, epochs=EPOCHS, augmentation="non
                     "dropout": efficientnet.HEAD_DROPOUT,   # classifier dropout of EfficientNet-B0
                     "pooling": None,   # not used: EfficientNet-B0 has its own pooling
                     "pretrained_weights": efficientnet.PRETRAINED_WEIGHTS,
-                    "effnet_mode": "feature_extraction",
+                    "effnet_mode": effnet_mode,
+                    "warmup_epochs": FT_WARMUP_EPOCHS if effnet_mode == "fine_tuning" else None,
+                    "unfrozen_stages": list(efficientnet.UNFREEZE_STAGES) if effnet_mode == "fine_tuning" else None,
                     "trainable_parts": efficientnet.trainable_parts(model),
                     "trainable_params": trainable,
                     "frozen_params": frozen,
@@ -471,7 +490,13 @@ def main():
     parser.add_argument("--resnet-mode", choices=list(RESNET_MODES), default=None,
                         help="feature_extraction = only fc trained; fine_tuning = fc, then layer4 from epoch "
                              f"{FT_WARMUP_EPOCHS + 1}")
+    parser.add_argument("--effnet-mode", choices=list(EFFNET_MODES), default=None,
+                        help="efficientnet_b0 only: feature_extraction (default) = only the classifier trained; "
+                             f"fine_tuning = classifier, then features[6:9] from epoch {FT_WARMUP_EPOCHS + 1}")
     args = parser.parse_args()
+    if args.model != "efficientnet_b0" and args.effnet_mode is not None:
+        parser.error("--effnet-mode is only used with --model efficientnet_b0")
+    effnet_mode = args.effnet_mode or "feature_extraction"
     if args.model == "resnet18" and args.resnet_mode is None:
         parser.error("--model resnet18 needs --resnet-mode feature_extraction|fine_tuning")
     if args.model == "efficientnet_b0" and not args.run_name.startswith(EFFNET_RUN_PREFIX):
@@ -495,7 +520,7 @@ def main():
         parser.error("--weight-decay must be >= 0")
     train(args.run_name, args.manifest, args.config, args.epochs, args.augmentation, args.dropout,
           args.pooling, args.optimizer, args.weight_decay, args.scheduler,
-          args.train_subset, args.batch_mode, args.loss, args.model, args.resnet_mode)
+          args.train_subset, args.batch_mode, args.loss, args.model, args.resnet_mode, effnet_mode)
 
 
 if __name__ == "__main__":
