@@ -376,6 +376,136 @@ one tenth of the `fc` rate, because the scheduler scales both groups by the same
   - At epoch 20, train F1 is 1.0000 vs validation F1 0.9378 (gap 0.0622).
   - Validation loss never returns to its epoch-7 minimum.
 
+## Fine-tuning with augmentation, weight decay and a scheduler (`resnet224_ft_aug_wd1e4_plateau`)
+
+An additional combination run on top of `resnet224_fine_tuning`: train-only `full_aug`, AdamW with
+weight decay 1e-4, and `ReduceLROnPlateau`. It changes three factors at once, so it cannot show
+which factor causes a difference. It is recorded here whatever its result, like every run before
+it; it is not removed because it scored better or worse.
+
+| Run | Command |
+|---|---|
+| `resnet224_ft_aug_wd1e4_plateau` | `python -m src.train --run-name resnet224_ft_aug_wd1e4_plateau --model resnet18 --resnet-mode fine_tuning --augmentation full_aug --optimizer adamw --weight-decay 1e-4 --scheduler plateau` |
+
+### Setup
+
+Recorded in the checkpoint:
+
+- ResNet18 with `IMAGENET1K_V1` weights, mode `fine_tuning`, 224x224 input, ImageNet
+  normalization
+- head only in epochs 1-5, `layer4` + `fc` from epoch 6 (trainable 8,397,832, frozen 2,782,784)
+- learning rates at the start: `fc` 1e-3, `layer4` 1e-4
+- augmentation `full_aug` (train only, same transform and parameters as `resnet224_ft_aug`)
+- AdamW, weight decay 1e-4
+- `ReduceLROnPlateau` on validation loss (mode min, factor 0.5, patience 3)
+- CrossEntropyLoss, dropout 0, 20 epochs, batch size 32 (standard batches), seed 42
+- train / validation = 2633 / 659
+
+Validation uses the unchanged `RESNET_TRANSFORM`, without augmentation.
+
+### Result (validation, best checkpoint)
+
+| Metric | Value |
+|---|---|
+| Best epoch | 20 |
+| Accuracy | 0.9560 (630 of 659) |
+| Macro precision | 0.9421 |
+| Macro recall | 0.9487 |
+| Macro F1 | 0.9442 |
+| Validation loss at best epoch | 0.1590 |
+
+The checkpoint stores epoch 20 and validation F1 0.9442. Re-evaluating it on the 659 validation
+images gives the same value.
+
+Per-class metrics:
+
+| Class | Precision | Recall | F1 | Support |
+|---|---|---|---|---|
+| ambulance | 0.9853 | 0.9054 | 0.9437 | 74 |
+| autobus | 1.0000 | 1.0000 | 1.0000 | 92 |
+| kamyun | 0.8824 | 0.9677 | 0.9231 | 93 |
+| kamyunet | 0.9444 | 0.8673 | 0.9043 | 98 |
+| minibus | 0.9872 | 0.9747 | 0.9809 | 79 |
+| savari | 0.9706 | 0.9900 | 0.9802 | 100 |
+| taxi | 1.0000 | 1.0000 | 1.0000 | 97 |
+| vanet | 0.7667 | 0.8846 | 0.8214 | 26 |
+
+Confusion matrix (rows = true class, columns = predicted class; 29 errors):
+
+| true \ predicted | ambulance | autobus | kamyun | kamyunet | minibus | savari | taxi | vanet |
+|---|---|---|---|---|---|---|---|---|
+| ambulance | 67 | 0 | 0 | 0 | 0 | 1 | 0 | 6 |
+| autobus | 0 | 92 | 0 | 0 | 0 | 0 | 0 | 0 |
+| kamyun | 0 | 0 | 90 | 3 | 0 | 0 | 0 | 0 |
+| kamyunet | 0 | 0 | 12 | 85 | 1 | 0 | 0 | 0 |
+| minibus | 0 | 0 | 0 | 2 | 77 | 0 | 0 | 0 |
+| savari | 0 | 0 | 0 | 0 | 0 | 99 | 0 | 1 |
+| taxi | 0 | 0 | 0 | 0 | 0 | 0 | 97 | 0 |
+| vanet | 1 | 0 | 0 | 0 | 0 | 2 | 0 | 23 |
+
+- **Most important confusion:** kamyunet -> kamyun, with 12 errors (41% of the 29).
+- **Other confusions:** ambulance -> vanet 6, kamyun -> kamyunet 3, vanet -> savari 2,
+  minibus -> kamyunet 2.
+- **Lowest F1 and lowest precision:** vanet (F1 0.8214, precision 0.7667; 23 of 30 vanet predictions
+  correct, 6 of the 7 wrong ones are true ambulance).
+- **Lowest recall:** kamyunet, 0.8673 (85 of 98), because of the 12 kamyunet -> kamyun errors.
+  vanet recall is 0.8846.
+
+### Learning rate
+
+The `lr` column shows the `fc` group; `layer4` is always one tenth of it.
+
+| Epochs | `fc` lr (logged) | `layer4` lr (derived) |
+|---|---|---|
+| 1-11 | 1e-3 | 1e-4 |
+| 12-17 | 5e-4 | 5e-5 |
+| 18-20 | 2.5e-4 | 2.5e-5 |
+
+- **First reduction:** validation loss was lowest at epoch 7 (0.1661) and did not improve in
+  epochs 8-11, so the rate was halved after epoch 11.
+- **Second reduction:** a new lowest value followed at epoch 13 (0.1348). After four epochs
+  without improvement (14-17), the rate was halved again after epoch 17.
+- **Check:** replaying the rule on the logged validation losses gives the same rates.
+- **Selected checkpoint:** the best epoch (20) comes after both reductions, at `fc` rate 2.5e-4.
+
+### Training behavior
+
+Train metrics are measured on augmented images during training. Validation is measured in eval
+mode without augmentation.
+
+- **Validation loss:** lowest 0.1348 at epoch 13; 0.1590 at the best-F1 epoch 20. After epoch 13
+  it varies between 0.1398 and 0.1762 and does not return to its minimum.
+- **Train loss:** keeps falling after epoch 13: 0.0328 at epoch 13, 0.012835 at epoch 20. Train
+  accuracy never reaches 1.0 (0.9958 at epoch 20).
+- **Overfitting:** the divergence after epoch 13, with train loss going down while validation loss
+  does not improve, is a sign of overfitting in the last epochs.
+- **Validation macro F1 after epoch 13:** between 0.9334 and 0.9442. The highest value is at the
+  last epoch (20), so the 20-epoch budget ends at the selected checkpoint.
+- **At epoch 20:**
+  - train F1 is 0.9946 and validation F1 is 0.9442, a gap of 0.0504
+  - validation loss minus train loss is 0.1461
+
+### Comparison
+
+| Run | Best epoch | Accuracy | Macro precision | Macro recall | Macro F1 | Correct / 659 |
+|---|---|---|---|---|---|---|
+| `resnet224_fine_tuning` | 8 | 0.9530 | 0.9448 | 0.9421 | 0.9432 | 628 |
+| `resnet224_ft_aug` | 20 | 0.9605 | 0.9456 | 0.9523 | 0.9482 | 633 |
+| `resnet224_ft_aug_wd1e4_plateau` | 20 | 0.9560 | 0.9421 | 0.9487 | 0.9442 | 630 |
+
+- **Against `resnet224_fine_tuning`:** slightly better. Macro F1 is +0.0010 and accuracy
+  0.9530 -> 0.9560; macro recall is higher and macro precision lower.
+- **Against `resnet224_ft_aug`:** weaker. Macro F1 is -0.0040 and 3 fewer images are correct.
+  - The per-class metrics are identical for ambulance, autobus, minibus, savari, taxi and vanet.
+    The whole difference is in kamyun / kamyunet: kamyunet -> kamyun 6 -> 12, kamyun -> kamyunet
+    6 -> 3.
+  - kamyun F1 falls from 0.9355 to 0.9231 and kamyunet F1 from 0.9239 to 0.9043.
+  - Up to epoch 5 the history agrees with `resnet224_ft_aug` to four decimals. The runs diverge
+    after that.
+- **Scope of this result:** this is an observation from a single run with seed 42. It is not
+  general evidence about the effect of this combination, and the differences of 0.0010 and 0.0040
+  in macro F1 are small for 659 validation images.
+
 ## Earlier 128x128 runs (exploratory)
 
 Before the input size was set to 224, both modes were run once with the same settings at 128x128
@@ -396,23 +526,25 @@ setting; it describes these runs and is not a measured effect of input size in g
 
 - Single run per setting, seed 42; validation only.
 - All ResNet runs described above are kept in this report, including `resnet224_ft_aug`,
-  `resnet224_ft_wd1e4` and `resnet224_ft_plateau`; none is removed or replaced because of its result.
+  `resnet224_ft_wd1e4`, `resnet224_ft_plateau` and `resnet224_ft_aug_wd1e4_plateau`; none is removed
+  or replaced because of its result.
 - The test set and the Neysan images were not used; these are not final test results.
 - The warm-up length (5 epochs) and the learning rates were fixed in advance and not tuned.
 - `resnet224_ft_aug`, `resnet224_ft_wd1e4` and `resnet224_ft_plateau` each change one factor
   (augmentation, weight decay, scheduler) against `resnet224_fine_tuning`; none was tuned further.
+  `resnet224_ft_aug_wd1e4_plateau` combines all three and cannot separate their effects.
 
 ## Files
 
 - Checkpoints: `checkpoints/resnet224_feature_extraction_best.pt`, `checkpoints/resnet224_fine_tuning_best.pt`,
   `checkpoints/resnet224_ft_aug_best.pt`, `checkpoints/resnet224_ft_wd1e4_best.pt`,
-  `checkpoints/resnet224_ft_plateau_best.pt`
+  `checkpoints/resnet224_ft_plateau_best.pt`, `checkpoints/resnet224_ft_aug_wd1e4_plateau_best.pt`
   (exploratory: `checkpoints/resnet_feature_extraction_best.pt`, `checkpoints/resnet_finetuning_best.pt`)
 - Histories: `reports/resnet224_feature_extraction_history.csv`, `reports/resnet224_fine_tuning_history.csv`,
   `reports/resnet224_ft_aug_history.csv`, `reports/resnet224_ft_wd1e4_history.csv`,
-  `reports/resnet224_ft_plateau_history.csv`
+  `reports/resnet224_ft_plateau_history.csv`, `reports/resnet224_ft_aug_wd1e4_plateau_history.csv`
 - Analysis output: `reports/analysis/resnet224_feature_extraction/`, `reports/analysis/resnet224_fine_tuning/`,
   `reports/analysis/resnet224_ft_aug/`, `reports/analysis/resnet224_ft_wd1e4/`,
-  `reports/analysis/resnet224_ft_plateau/`
+  `reports/analysis/resnet224_ft_plateau/`, `reports/analysis/resnet224_ft_aug_wd1e4_plateau/`
 - Code: `src/resnet.py`, `src/train.py` (`--model resnet18`; `resnet_full_aug_transform()` for
   `--augmentation full_aug`), `scripts/verify_resnet.py`

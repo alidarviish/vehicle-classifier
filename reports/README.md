@@ -26,6 +26,7 @@ been evaluated.
 | [ResNet18](experiments/08_resnet.md) | `resnet224_ft_aug` | 20 | 0.9605 | 0.9456 | 0.9523 | 0.9482 | Fine-tuning + train-only `full_aug` (224, ImageNet normalization) |
 | [ResNet18](experiments/08_resnet.md) | `resnet224_ft_wd1e4` | 8 | 0.9514 | 0.9435 | 0.9408 | 0.9419 | Fine-tuning + AdamW weight decay 1e-4 |
 | [ResNet18](experiments/08_resnet.md) | `resnet224_ft_plateau` | 8 | 0.9530 | 0.9448 | 0.9421 | 0.9432 | Fine-tuning + ReduceLROnPlateau; lr halved after epochs 11, 15, 19; selected weights identical to `resnet224_fine_tuning` |
+| [ResNet18](experiments/08_resnet.md) | `resnet224_ft_aug_wd1e4_plateau` | 20 | 0.9560 | 0.9421 | 0.9487 | 0.9442 | Fine-tuning + `full_aug` + AdamW weight decay 1e-4 + ReduceLROnPlateau; lr halved after epochs 11 and 17 |
 | [ResNet18](experiments/08_resnet.md) | `resnet_feature_extraction` | 7 | 0.8771 | 0.8781 | 0.8592 | 0.8666 | Exploratory run at 128x128 input |
 | [ResNet18](experiments/08_resnet.md) | `resnet_finetuning` | 7 | 0.9241 | 0.9173 | 0.9168 | 0.9165 | Exploratory run at 128x128 input |
 | [Combined](experiments/09_combined_aug_plateau.md) | `combo_aug_plateau` | 18 | 0.8983 | 0.8875 | 0.8844 | 0.8853 | `full_aug` + ReduceLROnPlateau (0.5, 3); lr halved after epochs 13 and 18 |
@@ -36,7 +37,8 @@ trains the baseline model on a simulated-imbalance subset of the training split 
 batch modes with each other. Experiment 08 uses a pretrained ResNet18 with 224x224 input and
 ImageNet normalization and compares feature extraction with fine-tuning; it also records fine-tuning
 with train-only augmentation (`resnet224_ft_aug`), with weight decay (`resnet224_ft_wd1e4`) and with
-a scheduler (`resnet224_ft_plateau`). Experiment 09 tests two
+a scheduler (`resnet224_ft_plateau`), and one combination of all three
+(`resnet224_ft_aug_wd1e4_plateau`). Experiment 09 tests two
 combinations on the baseline CNN (augmentation + scheduler, then also dropout + weight decay). See
 the linked report for the exact settings, per-class results and limitations.
 
@@ -61,6 +63,7 @@ were not used in this comparison.
 | ResNet18 fine-tuning + augmentation [5] | `resnet224_ft_aug` | 0.9605 | 0.9456 | 0.9523 | 0.9482 | vanet (0.8846) | vanet (0.7667) |
 | ResNet18 fine-tuning + weight decay [6] | `resnet224_ft_wd1e4` | 0.9514 | 0.9435 | 0.9408 | 0.9419 | vanet (0.8462) | vanet (0.8462) |
 | ResNet18 fine-tuning + scheduler [6] | `resnet224_ft_plateau` | 0.9530 | 0.9448 | 0.9421 | 0.9432 | vanet (0.8462) | vanet (0.8462) |
+| ResNet18 fine-tuning + augmentation + weight decay + scheduler [7] | `resnet224_ft_aug_wd1e4_plateau` | 0.9560 | 0.9421 | 0.9487 | 0.9442 | kamyunet (0.8673) | vanet (0.7667) |
 
 [1] The baseline is reported with the current validation labels. These include 8 label
 corrections: 7 kamyun -> kamyunet and 1 kamyunet -> kamyun. The metrics were recalculated from
@@ -98,6 +101,13 @@ row except for one factor: AdamW with weight decay 1e-4, or ReduceLROnPlateau. I
 `resnet224_fine_tuning`, so its row repeats the fine-tuning values. Both runs are recorded
 regardless of their result; no run is removed from this table because it scored better or worse.
 Single runs, seed 42. See `experiments/08_resnet.md`.
+
+[7] Additional combination run, not among the six required rows. It is the same as the
+fine-tuning row plus three changes: train-only `full_aug`, AdamW with weight decay 1e-4, and
+ReduceLROnPlateau. Validation is unchanged (`RESNET_TRANSFORM`, no augmentation). Its lowest-recall
+class is kamyunet, due to 12 kamyunet -> kamyun errors. It is kept regardless of its result. It is a
+single run with seed 42 and is not general evidence about the effect of this combination. See
+`experiments/08_resnet.md`.
 
 ## Other folders
 
