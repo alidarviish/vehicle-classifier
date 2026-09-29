@@ -65,6 +65,36 @@ Per-class recall:
 - Validation loss values are not compared between the two runs: CE and BCE losses are on
   different scales (BCE averages over 8 binary outputs per image).
 
+## Output scores: softmax (CE) vs sigmoid (BCE)
+
+- **CE.** The 8 logits go through one softmax. The 8 scores are coupled: raising one lowers the
+  others, and they always sum to 1. They form one distribution over the 8 mutually exclusive
+  classes.
+- **BCE.** `BCEWithLogitsLoss` with one-hot targets treats the task as 8 independent yes/no
+  questions ("is it class k?"). Each score is `sigmoid(logit_k)` on its own; no term ties the 8
+  scores together.
+  - For one image, several scores can be high, or all can be low.
+  - Their sum is not constrained to 1 and in general is not 1.
+- **How BCE scores should be read.** They are per-class scores, not a probability distribution
+  over the 8 classes. They should not be read like softmax outputs, and a BCE "confidence" (the
+  highest sigmoid score) is not on the same scale as a CE confidence (the highest softmax output).
+- **What this means for the project.** This is why the prediction output uses the selected CE model
+  with softmax, and why BCE scores are kept to this comparison. The `needs_review` threshold
+  (0.90) is defined on the softmax confidence of the final CE model (`11_needs_review_threshold.md`);
+  it does not transfer to BCE scores.
+
+## Confidence behaviour
+
+No per-image scores were saved for `loss_ce` or `loss_bce`. The analysis outputs in
+`reports/analysis/loss_ce/` and `reports/analysis/loss_bce/` contain metrics and confusion matrices
+only, and no separate confidence audit was run for this experiment. A numerical comparison of
+confidence (for example score distributions or how many predictions fall below a threshold) is
+therefore not reported here.
+
+The comparison above is qualitative and follows from how the two losses define their outputs. The
+available results compare only metrics based on the argmax prediction (see Results); they do not
+show how confident either model is.
+
 ## Conclusion
 
 On this validation split, CE and BCE gave very similar aggregate results, with small class-level
