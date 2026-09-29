@@ -165,8 +165,8 @@ predicted as kamyunet and 1 kamyunet image as kamyun (`12_final_test_evaluation.
   - It remains the weakest class: F1 0.8214, precision 0.7667.
   - 6 of the 7 wrong vanet predictions are true ambulance.
   - It has only 26 validation images, so each image changes its recall by about 0.038.
-- **kamyun / kamyunet.** These remain the most confused pair: 6 errors in each direction. No merge
-  or relabel decision has been made.
+- **kamyun / kamyunet.** These remain the most confused pair: 6 errors in each direction. The final
+  decision is `KEEP SEPARATE`; the classes were not merged.
 - **Validation-based selection.** The model was selected on the same validation set that was used
   to compare all runs. The validation metrics above are therefore not an unbiased estimate; the
   one-time Test evaluation (`12_final_test_evaluation.md`) is the estimate on held-out data.
