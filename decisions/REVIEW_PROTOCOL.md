@@ -1,12 +1,20 @@
 # Neysan review protocol
 
-Scope: the 500 images with folder label `vanet` in the train and unclean folders
-(v1 and v2) that may be Neysan. Test images are not part of this review.
+Scope: two Neysan reviews with the same criteria and decision values.
+
+- `neysan_review.csv`: the 500 images with folder label `vanet` in the train and unclean folders
+  (v1 and v2) that may be Neysan. No Test image is in this review.
+- `neysan_test_review.csv`: the 50 v1/test images with folder label `vanet`, reviewed before the Test
+  set was frozen. The 34 `CONFIRMED_NEYSAN` images were moved from Test to the Neysan evaluation set and
+  replaced by 34 approved `vanet` images from the train/val pool; the 16 `NOT_NEYSAN` images stayed in
+  Test (`docs/DATA_DECISIONS.md`, `decisions/test_frozen.csv`).
 
 Files in this folder:
 
 - `neysan_review_queue.csv`: one row per image (review_id, image_path, sha256, screening group, evidence, contact sheet name). Read only.
-- `neysan_review.csv`: the decisions. This is the only file the reviewer edits.
+- `neysan_review.csv`: the decisions. This file and `neysan_test_review.csv` are the only files the reviewer edits.
+- `neysan_test_review_queue.csv`: the 50 v1/test vanet images (review_id `T…`, image_path, sha256, source, origin_split, folder_label). Read only.
+- `neysan_test_review.csv`: the decisions for these 50 images.
 
 Images are never copied into this repository. The reviewer looks at the
 contact sheets (generated outside the repository, never committed) or opens
@@ -42,7 +50,7 @@ Write exactly one of these three values in the `decision` column:
 
 | decision | meaning | effect later |
 |---|---|---|
-| `CONFIRMED_NEYSAN` | Clearly the Iranian Nissan pickup | Removed from the 8-class training pool; kept for Neysan evaluation (model_label = vanet, subtype = neysan) |
+| `CONFIRMED_NEYSAN` | Clearly the Iranian Nissan pickup | Removed from the 8-class training pool (or, for v1/test images, from Test); kept for Neysan evaluation (model_label = vanet, subtype = neysan) |
 | `NOT_NEYSAN` | Clearly a different pickup (including modern Nissan pickups) | Not Neysan; can stay in `vanet`, subject to the other cleaning rules |
 | `UNCERTAIN` | Cannot decide from the image | No inclusion/exclusion decision is made yet |
 
