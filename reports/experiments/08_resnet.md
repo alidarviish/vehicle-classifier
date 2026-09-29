@@ -321,8 +321,12 @@ Confusion matrix of `resnet224_ft_plateau` (31 errors); it is identical to the m
 
 - **Overall:** against `resnet224_fine_tuning`, macro F1 0.9432 -> 0.9419 (-0.0013) and accuracy
   0.9530 -> 0.9514, i.e. 627 instead of 628 correct. The confusion matrices differ in one image:
-  one more kamyunet -> kamyun error (7 instead of 6), so kamyun and kamyunet precision/recall/F1
-  change slightly. All other classes are identical.
+  one more kamyunet -> kamyun error (7 instead of 6).
+  - kamyun: recall is unchanged (0.9355 -> 0.9355); only precision (0.9158 -> 0.9062) and F1
+    (0.9255 -> 0.9206) change.
+  - kamyunet: all three metrics change: precision 0.9184 -> 0.9175, recall 0.9184 -> 0.9082,
+    F1 0.9184 -> 0.9128.
+  - All other classes are identical.
 - **Histories:** the history differs from `resnet224_fine_tuning` from epoch 1, but in epochs 1-5
   the values agree to 4 decimals except the epoch-2 validation loss (0.6101 vs 0.6100). The two runs
   stay close throughout.
