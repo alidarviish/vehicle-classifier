@@ -75,6 +75,38 @@ vanet and kamyun / kamyunet (counts from the confusion matrices):
 | `resnet224_ft_aug` | 23 | 30 | 0.7667 | 6 | 6 | 6 |
 | `resnet224_ft_aug_wd1e4_plateau` | 23 | 30 | 0.7667 | 6 | 3 | 12 |
 
+## Class relationships and merge decision
+
+**kamyun / kamyunet: KEEP SEPARATE.** The decision is based on validation.
+
+- **Final model, validation.**
+  - Confusions: kamyun -> kamyunet 6/93, kamyunet -> kamyun 6/98.
+  - These are 12 of the 26 validation errors.
+  - Pair score 0.1257 (sum of the two row-normalized rates), the highest pair. Next is
+    ambulance/vanet at 0.1195.
+  - Most images of both classes are still classified correctly: F1 kamyun 0.9355, kamyunet 0.9239.
+- **Other runs.** The direction of the confusion (kamyun -> kamyunet / kamyunet -> kamyun) varies:
+  - 6/6 in `resnet224_fine_tuning`
+  - 3/12 in `resnet224_ft_aug_wd1e4_plateau`
+  - 10/10 in `combo_aug_plateau`
+- **Human label review.** In `decisions/kamyun_kamyunet_review.csv` and
+  `decisions/kamyunet_kamyun_review.csv`, 16 reviewed images were kept as labelled, 8 were relabelled
+  and 1 is `UNCERTAIN`.
+- **Reading.** The confusion is read as an ambiguous class boundary with some label noise, not as
+  evidence that the two are one class.
+
+Why the classes are not merged:
+
+- **Taxonomy.** A merge would change the 8-class taxonomy.
+- **Retraining.** A merge would require retraining on a new label mapping.
+- **Comparability.** The results could not be compared directly with the existing experiments.
+- **Test already used.** The 8-class frozen Test set has already been used once.
+- **Not enough on its own.** The existing confusion alone is not a sufficient reason to remove the
+  distinction.
+
+Reported for completeness, not used for this decision: on the frozen Test, 8 kamyun images were
+predicted as kamyunet and 1 kamyunet image as kamyun (`12_final_test_evaluation.md`).
+
 ## Selected model
 
 - **Run:** `resnet224_ft_aug`
