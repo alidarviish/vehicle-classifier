@@ -194,6 +194,23 @@ for label, argv in [
 ]:
     status, _ = cli(argv)
     check(f"CLI rejects {label}", status.startswith("rejected"), status)
+status, args = cli(["--run-name", "effnet_b0_ft_none", *eff, "--effnet-mode", "fine_tuning"])
+check("CLI fine_tuning without --effnet-top-lr -> features[6:9] lr = EFFNET_TOP_LR (1e-4), baseline unchanged",
+      status == "ok" and args is not None and args[16] == T.EFFNET_TOP_LR == 1e-4 and T.EFFNET_HEAD_LR == 1e-3, status)
+status, args = cli(["--run-name", "effnet_b0_ft_lr5e5_none", *eff, "--effnet-mode", "fine_tuning", "--effnet-top-lr", "5e-5"])
+check("CLI --effnet-top-lr 5e-5 with efficientnet_b0 fine_tuning accepted (train() gets 5e-5)",
+      status == "ok" and args is not None and args[15] == "fine_tuning" and args[16] == 5e-5, status)
+for label, argv in [
+    ("--effnet-top-lr with feature_extraction", ["--run-name", "effnet_b0_x", *eff, "--effnet-mode", "feature_extraction",
+                                                 "--effnet-top-lr", "5e-5"]),
+    ("--effnet-top-lr without --effnet-mode (feature_extraction)", ["--run-name", "effnet_b0_x", *eff, "--effnet-top-lr", "5e-5"]),
+    ("--effnet-top-lr with resnet18", ["--run-name", "x", "--model", "resnet18", "--resnet-mode", "fine_tuning",
+                                       "--effnet-top-lr", "5e-5"]),
+    ("--effnet-top-lr 0", ["--run-name", "effnet_b0_x", *eff, "--effnet-mode", "fine_tuning", "--effnet-top-lr", "0"]),
+    ("--effnet-top-lr negative", ["--run-name", "effnet_b0_x", *eff, "--effnet-mode", "fine_tuning", "--effnet-top-lr=-1e-4"]),
+]:
+    status, _ = cli(argv)
+    check(f"CLI rejects {label}", status.startswith("rejected"), status)
 
 
 # 7. train(): overwrite / name guards and the transforms it passes on (stopped before any training)
@@ -289,12 +306,29 @@ with tempfile.TemporaryDirectory() as tmp:
               and ck["transform"]["augmentation"] == "none",
               str({k: ck[k] for k in ("effnet_mode", "warmup_epochs", "unfrozen_stages", "trainable_parts",
                                       "trainable_params", "frozen_params", "param_group_lrs")}))
+        check("history lr_top (fine_tuning, default) = 1e-4 in every epoch, lr (classifier) = 1e-3",
+              [r.get("lr_top") for r in hist] == [1e-4] * 6 and [r["lr"] for r in hist] == [1e-3] * 6)
+        hist = T.train("effnet_b0_ft_lr_smoke", T.DEFAULT_MANIFEST, T.DEFAULT_CONFIG, epochs=6,
+                       model_name="efficientnet_b0", effnet_mode="fine_tuning", effnet_top_lr=5e-5)
+        ck = torch.load(T.CHECKPOINT_DIR / "effnet_b0_ft_lr_smoke_best.pt", map_location="cpu", weights_only=True)
+        check("effnet_top_lr=5e-5: param_group_lrs == {'classifier': 1e-3, 'features.6-8': 5e-5}",
+              ck["param_group_lrs"] == {"classifier": 1e-3, "features.6-8": 5e-5}, str(ck["param_group_lrs"]))
+        check("effnet_top_lr=5e-5: history lr_top = 5e-5 and lr (classifier) = 1e-3 in every epoch",
+              [r.get("lr_top") for r in hist] == [5e-5] * 6 and [r["lr"] for r in hist] == [1e-3] * 6,
+              f"lr_top {[r.get('lr_top') for r in hist]}")
+        try:
+            T.train("effnet_b0_ft_lr0_smoke", T.DEFAULT_MANIFEST, T.DEFAULT_CONFIG, epochs=1,
+                    model_name="efficientnet_b0", effnet_mode="fine_tuning", effnet_top_lr=0.0)
+            check("train() rejects effnet_top_lr <= 0", False)
+        except ValueError:
+            check("train() rejects effnet_top_lr <= 0", True)
         hist = T.train("effnet_b0_fe_smoke", T.DEFAULT_MANIFEST, T.DEFAULT_CONFIG, epochs=2, model_name="efficientnet_b0")
         ck = torch.load(T.CHECKPOINT_DIR / "effnet_b0_fe_smoke_best.pt", map_location="cpu", weights_only=True)
         check("checkpoint metadata (feature_extraction, the default) unchanged",
               ck["effnet_mode"] == "feature_extraction" and ck["warmup_epochs"] is None and ck["unfrozen_stages"] is None
               and ck["trainable_parts"] == ["classifier"] and ck["trainable_params"] == 10248
               and ck["param_group_lrs"] == {"classifier": 1e-3} and [r["trainable_params"] for r in hist] == [10248, 10248])
+        check("feature_extraction history has no lr_top column", all("lr_top" not in r for r in hist))
     finally:
         T.REPORTS_DIR, T.CHECKPOINT_DIR, T.build_loaders, T.run_epoch = real_reports, real_ckpt, real_loaders, real_epoch
 
