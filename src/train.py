@@ -4,6 +4,7 @@ Run from the repository root:
     python -m src.train
     python -m src.train --config configs/local_paths.json
     python -m src.train --run-name resnet_feature_extraction --model resnet18 --resnet-mode feature_extraction
+    python -m src.train --run-name effnet_b0_fe_aug --model efficientnet_b0 --augmentation full_aug
 
 Only the "train" and "val" rows of data/split_manifest.csv are used.
 The test set is not read anywhere in this file.
@@ -32,6 +33,7 @@ from src.dataset import CLASS_TO_IDX, CLASSES, DEFAULT_CONFIG, DEFAULT_MANIFEST,
 from src.balanced_sampler import BalancedBatchSampler
 from src.model import POOLING_TYPES, BaselineCNN
 from src.resnet import PRETRAINED_WEIGHTS, build_resnet18, count_params, trainable_parts, unfreeze_layer4
+from src import efficientnet
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 REPORTS_DIR = REPO_ROOT / "reports"
@@ -101,7 +103,7 @@ AUGMENTATION_PARAMS = {
 # backbone was trained on) and ImageNet normalization. RESNET_TRANSFORM (no augmentation) is always
 # used for validation, and for training unless --augmentation full_aug is given.
 # The baseline keeps IMAGE_SIZE = 128.
-MODELS = ("baseline", "resnet18")
+MODELS = ("baseline", "resnet18", "efficientnet_b0")
 RESNET_MODES = ("feature_extraction", "fine_tuning")
 RESNET_IMAGE_SIZE = 224
 RESNET_NORM_MEAN = [0.485, 0.456, 0.406]
@@ -138,6 +140,13 @@ RESNET_TRAIN_TRANSFORMS = {"none": RESNET_TRANSFORM, "full_aug": resnet_full_aug
 RESNET_HEAD_LR = LEARNING_RATE   # new 8-class head (fc), 1e-3
 RESNET_LAYER4_LR = 1e-4          # pretrained layer4, 10x smaller
 FT_WARMUP_EPOCHS = 5             # fine-tuning: fc only in epochs 1-5, layer4 unfrozen from epoch 6
+
+# EfficientNet-B0: separate comparison experiment (src/efficientnet.py), feature extraction only.
+# It uses the same 224x224 input, ImageNet normalization and train transforms as ResNet18, and the
+# same head learning rate. Its run names must start with EFFNET_RUN_PREFIX and it never overwrites
+# an existing checkpoint or history, so the ResNet18 artifacts (incl. the final model) are never touched.
+EFFNET_HEAD_LR = LEARNING_RATE   # new 8-class classifier, 1e-3 (same as RESNET_HEAD_LR)
+EFFNET_RUN_PREFIX = "effnet_b0_"
 
 DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
@@ -266,12 +275,20 @@ def train(run_name, manifest_path, config_path, epochs=EPOCHS, augmentation="non
           pooling="max", optimizer_name="adam", weight_decay=WEIGHT_DECAY, scheduler_name="none",
           train_subset=None, batch_mode="standard", loss_name="ce", model_name="baseline",
           resnet_mode=None):
+    is_resnet = model_name == "resnet18"
+    is_effnet = model_name == "efficientnet_b0"
+    if is_effnet:
+        if not run_name.startswith(EFFNET_RUN_PREFIX):
+            raise ValueError(f"EfficientNet-B0 run names must start with '{EFFNET_RUN_PREFIX}', got '{run_name}'")
+        existing = [p for p in (CHECKPOINT_DIR / f"{run_name}_best.pt", REPORTS_DIR / f"{run_name}_history.csv")
+                    if p.exists()]
+        if existing:
+            raise FileExistsError(f"refusing to overwrite existing run files: {[p.name for p in existing]}")
     set_seed()
     REPORTS_DIR.mkdir(exist_ok=True)
     CHECKPOINT_DIR.mkdir(exist_ok=True)
 
-    is_resnet = model_name == "resnet18"
-    if is_resnet:
+    if is_resnet or is_effnet:   # both pretrained models: 224x224, ImageNet normalization
         train_transform, val_transform = RESNET_TRAIN_TRANSFORMS[augmentation], RESNET_TRANSFORM
     else:
         train_transform, val_transform = TRAIN_TRANSFORMS[augmentation], BASE_TRANSFORM
@@ -302,6 +319,14 @@ def train(run_name, manifest_path, config_path, epochs=EPOCHS, augmentation="non
         print(f"model resnet18 ({PRETRAINED_WEIGHTS}) | mode {resnet_mode} | trainable {trainable:,} "
               f"| frozen {frozen:,} | lr per group {group_lrs}"
               + (f" | layer4 unfrozen from epoch {FT_WARMUP_EPOCHS + 1}" if resnet_mode == "fine_tuning" else ""))
+    elif is_effnet:
+        model = efficientnet.build_efficientnet_b0(num_classes=len(CLASSES)).to(DEVICE)   # features frozen
+        group_lrs = {"classifier": EFFNET_HEAD_LR}
+        param_groups = [{"params": list(model.net.classifier.parameters()), "lr": EFFNET_HEAD_LR}]
+        optimizer = OPTIMIZERS[optimizer_name](param_groups, weight_decay=weight_decay)
+        trainable, frozen = efficientnet.count_params(model)
+        print(f"model efficientnet_b0 ({efficientnet.PRETRAINED_WEIGHTS}) | mode feature_extraction "
+              f"| head {model.net.classifier} | trainable {trainable:,} | frozen {frozen:,} | lr per group {group_lrs}")
     else:
         model = BaselineCNN(num_classes=len(CLASSES), image_size=IMAGE_SIZE, dropout=dropout,
                             pooling=pooling).to(DEVICE)
@@ -332,6 +357,8 @@ def train(run_name, manifest_path, config_path, epochs=EPOCHS, augmentation="non
         row["lr"] = optimizer.param_groups[0]["lr"]
         if is_resnet:
             row["trainable_params"] = count_params(model)[0]   # ResNet histories only
+        elif is_effnet:
+            row["trainable_params"] = efficientnet.count_params(model)[0]
         history.append(row)
         print(f"epoch {epoch:2d} | train_loss {train_m['loss']:.4f} | val_loss {val_m['loss']:.4f} "
               f"| val_acc {val_m['accuracy']:.4f} | val_f1 {val_m['f1']:.4f}")
@@ -381,6 +408,23 @@ def train(run_name, manifest_path, config_path, epochs=EPOCHS, augmentation="non
                     "frozen_params": frozen,
                     "param_group_lrs": group_lrs,
                 })
+            elif is_effnet:
+                trainable, frozen = efficientnet.count_params(model)
+                checkpoint.update({
+                    "architecture": "EfficientNet-B0",
+                    "image_size": RESNET_IMAGE_SIZE,
+                    "transform": {"resize": [RESNET_IMAGE_SIZE, RESNET_IMAGE_SIZE], "normalize_mean": RESNET_NORM_MEAN,
+                                  "normalize_std": RESNET_NORM_STD, "augmentation": augmentation,
+                                  "augmentation_params": AUGMENTATION_PARAMS[augmentation]},
+                    "dropout": efficientnet.HEAD_DROPOUT,   # classifier dropout of EfficientNet-B0
+                    "pooling": None,   # not used: EfficientNet-B0 has its own pooling
+                    "pretrained_weights": efficientnet.PRETRAINED_WEIGHTS,
+                    "effnet_mode": "feature_extraction",
+                    "trainable_parts": efficientnet.trainable_parts(model),
+                    "trainable_params": trainable,
+                    "frozen_params": frozen,
+                    "param_group_lrs": group_lrs,
+                })
             torch.save(checkpoint, checkpoint_path)
             print(f"  -> saved {checkpoint_path.name} (val_f1 {best_f1:.4f})")
 
@@ -422,14 +466,17 @@ def main():
     parser.add_argument("--loss", choices=list(LOSSES), default="ce",
                         help="ce = CrossEntropyLoss (baseline), bce = BCEWithLogitsLoss on one-hot targets")
     parser.add_argument("--model", choices=list(MODELS), default="baseline",
-                        help="baseline = BaselineCNN (default), resnet18 = pretrained ResNet18 (needs --resnet-mode)")
+                        help="baseline = BaselineCNN (default), resnet18 = pretrained ResNet18 (needs --resnet-mode), "
+                             f"efficientnet_b0 = pretrained EfficientNet-B0, classifier only (run name '{EFFNET_RUN_PREFIX}...')")
     parser.add_argument("--resnet-mode", choices=list(RESNET_MODES), default=None,
                         help="feature_extraction = only fc trained; fine_tuning = fc, then layer4 from epoch "
                              f"{FT_WARMUP_EPOCHS + 1}")
     args = parser.parse_args()
-    if args.model == "resnet18":
-        if args.resnet_mode is None:
-            parser.error("--model resnet18 needs --resnet-mode feature_extraction|fine_tuning")
+    if args.model == "resnet18" and args.resnet_mode is None:
+        parser.error("--model resnet18 needs --resnet-mode feature_extraction|fine_tuning")
+    if args.model == "efficientnet_b0" and not args.run_name.startswith(EFFNET_RUN_PREFIX):
+        parser.error(f"--model efficientnet_b0 needs a run name starting with '{EFFNET_RUN_PREFIX}'")
+    if args.model in ("resnet18", "efficientnet_b0"):
         not_supported = [flag for flag, used in [
             ("--augmentation " + args.augmentation, args.augmentation not in RESNET_TRAIN_TRANSFORMS),
             ("--dropout", args.dropout != DROPOUT),
@@ -439,8 +486,8 @@ def main():
             ("--train-subset", args.train_subset is not None),
         ] if used]
         if not_supported:
-            parser.error(f"not supported with --model resnet18: {', '.join(not_supported)}")
-    elif args.resnet_mode is not None:
+            parser.error(f"not supported with --model {args.model}: {', '.join(not_supported)}")
+    if args.model != "resnet18" and args.resnet_mode is not None:
         parser.error("--resnet-mode is only used with --model resnet18")
     if not 0.0 <= args.dropout < 1.0:
         parser.error("--dropout must be in [0, 1)")
