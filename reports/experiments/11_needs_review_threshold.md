@@ -2,8 +2,9 @@
 
 Status: threshold decided on validation (0.90) and used in `src/predict.py`. The smoke test of
 `src/predict.py` passed 27 of 27 checks; it used a synthetic image and one validation image
-(read-only), not the test set. The test set has **not** been evaluated and was not used; the Neysan
-images were not used.
+(read-only), not the test set. The test set was not used to choose the threshold; it was evaluated
+once afterwards with this threshold (see `12_final_test_evaluation.md`). The Neysan images were not
+used.
 
 ## Purpose
 
@@ -87,9 +88,10 @@ reproduced in this report.
   the selected threshold in the checkpoint metadata; this project keeps it in `src/predict.py`
   instead, next to the frozen checkpoint it is used with.
 
-The remaining step is to evaluate the frozen test set once with this checkpoint and this threshold.
+The frozen test set was then evaluated once with this checkpoint and this threshold
+(`12_final_test_evaluation.md`).
 
 ## Test set
 
-The test set has not been evaluated. No test image, prediction or metric was used to choose this
-threshold.
+No test image, prediction or metric was used to choose this threshold. The test set was evaluated
+only afterwards, once, with the threshold unchanged at 0.90 (`12_final_test_evaluation.md`).

@@ -1,7 +1,8 @@
 # Final model selection (validation only)
 
-Status: model selected on validation. The test set has **not** been evaluated yet and played no
-part in this selection. The Neysan images were not used either.
+Status: model selected on validation. The test set played no part in this selection. It was
+evaluated once afterwards, after this selection, the `needs_review` threshold and the inference
+protocol were fixed (see `12_final_test_evaluation.md`). The Neysan images were not used.
 
 ## Candidates and rule
 
@@ -136,19 +137,24 @@ vanet and kamyun / kamyunet (counts from the confusion matrices):
   or relabel decision has been made.
 - **Validation-based selection.** The model was selected on the same validation set that was used
   to compare all runs. The validation metrics above are therefore not an unbiased estimate; the
-  test set is kept for that.
+  one-time Test evaluation (`12_final_test_evaluation.md`) is the estimate on held-out data.
 - **`needs_review` threshold:** it was chosen after this selection, on validation only. The final
   value is 0.90, and the test set was not used to choose it. The evidence is in
   `11_needs_review_threshold.md`.
-- **Not yet done:** the test evaluation (once, on the frozen test set) and the Neysan / unclean
-  analysis are still to do.
+- **Test evaluation:** done once, on the frozen test set, after this selection (see
+  `12_final_test_evaluation.md`).
+- **Not yet done:** the Neysan / unclean analysis.
 
 ## Test set
 
-The test set has not been evaluated. No test image, prediction or metric was used for this
-selection. The validation-only `needs_review` threshold has since been fixed at 0.90 (see
-`11_needs_review_threshold.md`), also without the test set. The test set will be evaluated once with
-the selected checkpoint and this threshold.
+No test image, prediction or metric was used for this selection. The validation-only `needs_review`
+threshold was then fixed at 0.90 (see `11_needs_review_threshold.md`), also without the test set.
+
+Only after this selection, the threshold and the inference protocol (`src/predict.py`) were fixed
+was the test set evaluated, once, with the selected checkpoint and this threshold
+(`scripts/evaluate_test.py`, run `final_test_20260929T080908Z`). Results are in
+`12_final_test_evaluation.md`: accuracy 0.9475, macro precision 0.9515, macro recall 0.9475,
+macro F1 0.9473 on 400 images. They were not used to change the selection.
 
 The selected checkpoint remains frozen with the SHA256 above. The threshold is stored in
 `src/predict.py`, not in the checkpoint metadata. Re-saving the checkpoint only to add metadata

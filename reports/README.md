@@ -2,8 +2,10 @@
 
 Validation results of every experiment run so far (split `data/split_manifest.csv`,
 train / validation = 2633 / 659 unless noted, seed 42; each run was trained once). Metrics are for
-the checkpoint with the highest validation macro F1. The test set and the Neysan images have not
-been evaluated.
+the checkpoint with the highest validation macro F1. All metrics in this index are validation
+results. The test set was evaluated once, only after the final model, the `needs_review` threshold
+and the inference protocol were fixed (see [Final Test evaluation](#final-test-evaluation)). The
+Neysan images have not been evaluated.
 
 | Experiment | Run | Best epoch | Val accuracy | Macro precision | Macro recall | Macro F1 | Note |
 |---|---|---|---|---|---|---|---|
@@ -115,14 +117,32 @@ Selected on validation only (see [10_final_model_selection.md](experiments/10_fi
 **`resnet224_ft_aug`**, checkpoint `checkpoints/resnet224_ft_aug_best.pt` (epoch 20). Its validation
 results are accuracy 0.9605, macro precision 0.9456, macro recall 0.9523 and macro F1 0.9482; it has
 the highest macro F1 of all runs. Known weaknesses are vanet (F1 0.8214, precision 0.7667) and the
-kamyun / kamyunet confusion. The test set has not been evaluated yet and was not used for this
-selection.
+kamyun / kamyunet confusion. The test set was not used for this selection; it was evaluated once
+afterwards (see below).
 
 Chosen `needs_review` threshold (validation only, see
 [11_needs_review_threshold.md](experiments/11_needs_review_threshold.md)): **0.90**. A prediction
 whose confidence is below 0.90 gets a human-review flag; nothing is rejected. On validation this
 flags 35 of 659 images, 13 of the 26 errors and 22 correct predictions, and leaves coverage at 94.7%.
-The test set has not been used.
+The test set was not used to choose it.
+
+## Final Test evaluation
+
+[12_final_test_evaluation.md](experiments/12_final_test_evaluation.md) (per-image predictions:
+[12_final_test_predictions.csv](experiments/12_final_test_predictions.csv)). Status: completed, run
+once (`final_test_20260929T080908Z`) with `scripts/evaluate_test.py` at commit `b02782f`, after the
+final model, the threshold and the inference protocol (`src/predict.py`) were fixed. The frozen test
+set (`decisions/test_frozen.csv`, 400 images, 50 per class) and the frozen checkpoint
+`checkpoints/resnet224_ft_aug_best.pt` were used unchanged; Neysan images were not part of this run.
+
+| Test (400 images) | Value |
+|---|---|
+| Correct / incorrect | 379 / 21 |
+| Accuracy | 0.9475 |
+| Macro precision | 0.9515 |
+| Macro recall | 0.9475 |
+| Macro F1 | 0.9473 |
+| `needs_review` (confidence < 0.90) | 29 (17 correct, 12 incorrect); 9 errors not flagged |
 
 ## Other folders
 
