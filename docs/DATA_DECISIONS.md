@@ -88,6 +88,23 @@ After a visual review of baseline validation errors, 8 validation images were re
 - The 8 human label corrections are applied to the `label` column after the split; all 8 are in
   validation.
 
+Class counts of the final split (`label` column of `data/split_manifest.csv`, after the 8 label
+corrections):
+
+| Class | Train | Validation |
+|---|---:|---:|
+| ambulance | 294 | 74 |
+| autobus | 370 | 92 |
+| kamyun | 397 | 93 |
+| kamyunet | 367 | 98 |
+| minibus | 314 | 79 |
+| savari | 399 | 100 |
+| taxi | 389 | 97 |
+| vanet | 103 | 26 |
+| **Total** | **2633** | **659** |
+
+Train + validation = 3292 images.
+
 ## Images from `unclean` folders in the training data
 
 - Images with `origin_split=unclean` enter `train_val_pool` only after the project's cleaning steps:
