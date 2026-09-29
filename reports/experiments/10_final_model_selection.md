@@ -175,7 +175,9 @@ predicted as kamyunet and 1 kamyunet image as kamyun (`12_final_test_evaluation.
   `11_needs_review_threshold.md`.
 - **Test evaluation:** done once, on the frozen test set, after this selection (see
   `12_final_test_evaluation.md`).
-- **Not yet done:** the Neysan / unclean analysis.
+- **Neysan / unclean analysis:** done after this selection, inference only, with the selected
+  checkpoint and threshold unchanged (see `13_neysan_unclean_analysis.md`). It was not used for this
+  selection or any other decision.
 
 ## Test set
 

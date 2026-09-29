@@ -5,7 +5,8 @@ train / validation = 2633 / 659 unless noted, seed 42; each run was trained once
 the checkpoint with the highest validation macro F1. All metrics in this index are validation
 results. The test set was evaluated once, only after the final model, the `needs_review` threshold
 and the inference protocol were fixed (see [Final Test evaluation](#final-test-evaluation)). The
-Neysan images have not been evaluated.
+Neysan evaluation set was analysed separately, inference only, after the Test evaluation (see
+[Neysan evaluation](#neysan-evaluation)); it was not used for any decision.
 
 | Experiment | Run | Best epoch | Val accuracy | Macro precision | Macro recall | Macro F1 | Note |
 |---|---|---|---|---|---|---|---|
@@ -143,6 +144,17 @@ set (`decisions/test_frozen.csv`, 400 images, 50 per class) and the frozen check
 | Macro recall | 0.9475 |
 | Macro F1 | 0.9473 |
 | `needs_review` (confidence < 0.90) | 29 (17 correct, 12 incorrect); 9 errors not flagged |
+
+## Neysan evaluation
+
+[13_neysan_unclean_analysis.md](experiments/13_neysan_unclean_analysis.md) (per-image predictions:
+[13_neysan_predictions.csv](experiments/13_neysan_predictions.csv)). Status: completed, run once
+(`neysan_eval_20260929T083557Z`) with `scripts/evaluate_neysan.py` at commit `8b17c5f`, with the frozen
+checkpoint and the 0.90 threshold unchanged. Neysan is an unseen subtype of `vanet`, not a ninth class;
+the 621 images (371 human-confirmed, 250 policy N1) were not in train, validation or Test. 529 of 621
+were predicted `vanet` (0.8544 on the 371 confirmed images), 92 as another class, and 185 were flagged
+`needs_review`. The report also covers data provenance and the unclean-origin accounting. The results are
+descriptive only; no label, taxonomy, threshold or Test decision was made from them.
 
 ## Other folders
 
