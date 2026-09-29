@@ -139,6 +139,11 @@ Train + validation = 3292 images.
 - Raw datasets (v1 `dataset/`, v2 `datasetv2_TrainUclean/`) and all images stay outside the
   repository; their local paths are in `configs/local_paths.json` (not tracked).
 - `data/manifest.csv` and `data/split_manifest.csv` are generated and not tracked.
+- Labelled sample figure (data audit): 16 dataset images, 2 per class for all 8 classes, each
+  shown with its class label. The images are the first two of each class from `v1/train` in
+  `data/manifest.csv`. Because the dataset is private, the figure is kept outside the repository and
+  is not committed to Git (it must not be). It can be reproduced with
+  `scripts/make_labelled_sample_figure.py`.
 
 ## Known reproducibility gaps
 
