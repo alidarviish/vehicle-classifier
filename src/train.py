@@ -98,7 +98,8 @@ AUGMENTATION_PARAMS = {
 }
 
 # ResNet18 transfer learning: ImageNet-compatible input (224x224, the size the pretrained
-# backbone was trained on) and ImageNet normalization; no augmentation; used for train and val.
+# backbone was trained on) and ImageNet normalization. RESNET_TRANSFORM (no augmentation) is always
+# used for validation, and for training unless --augmentation full_aug is given.
 # The baseline keeps IMAGE_SIZE = 128.
 MODELS = ("baseline", "resnet18")
 RESNET_MODES = ("feature_extraction", "fine_tuning")
@@ -117,6 +118,23 @@ def resnet_transform(size=RESNET_IMAGE_SIZE, mean=RESNET_NORM_MEAN, std=RESNET_N
 
 
 RESNET_TRANSFORM = resnet_transform()
+
+
+def resnet_full_aug_transform(size=RESNET_IMAGE_SIZE, mean=RESNET_NORM_MEAN, std=RESNET_NORM_STD):
+    """Train-only ResNet version of full_aug: same augmentations and values as FULL_AUG_TRANSFORM,
+    but 224x224 output and ImageNet normalization (FULL_AUG_TRANSFORM is 128x128, mean/std 0.5)."""
+    return transforms.Compose([
+        transforms.RandomResizedCrop(size, scale=CROP_SCALE),
+        transforms.RandomHorizontalFlip(),
+        transforms.RandomRotation(ROTATION_DEGREES),
+        transforms.ColorJitter(brightness=BRIGHTNESS, contrast=CONTRAST),
+        transforms.ToTensor(),
+        transforms.Normalize(mean=mean, std=std),
+    ])
+
+
+# train transform per --augmentation value for ResNet18; validation always uses RESNET_TRANSFORM
+RESNET_TRAIN_TRANSFORMS = {"none": RESNET_TRANSFORM, "full_aug": resnet_full_aug_transform()}
 RESNET_HEAD_LR = LEARNING_RATE   # new 8-class head (fc), 1e-3
 RESNET_LAYER4_LR = 1e-4          # pretrained layer4, 10x smaller
 FT_WARMUP_EPOCHS = 5             # fine-tuning: fc only in epochs 1-5, layer4 unfrozen from epoch 6
@@ -254,7 +272,7 @@ def train(run_name, manifest_path, config_path, epochs=EPOCHS, augmentation="non
 
     is_resnet = model_name == "resnet18"
     if is_resnet:
-        train_transform = val_transform = RESNET_TRANSFORM
+        train_transform, val_transform = RESNET_TRAIN_TRANSFORMS[augmentation], RESNET_TRANSFORM
     else:
         train_transform, val_transform = TRAIN_TRANSFORMS[augmentation], BASE_TRANSFORM
     train_loader, val_loader = build_loaders(manifest_path, config_path, train_transform,
@@ -352,8 +370,8 @@ def train(run_name, manifest_path, config_path, epochs=EPOCHS, augmentation="non
                     "architecture": "ResNet18",
                     "image_size": RESNET_IMAGE_SIZE,
                     "transform": {"resize": [RESNET_IMAGE_SIZE, RESNET_IMAGE_SIZE], "normalize_mean": RESNET_NORM_MEAN,
-                                  "normalize_std": RESNET_NORM_STD, "augmentation": "none",
-                                  "augmentation_params": None},
+                                  "normalize_std": RESNET_NORM_STD, "augmentation": augmentation,
+                                  "augmentation_params": AUGMENTATION_PARAMS[augmentation]},
                     "pooling": None,   # not used: ResNet18 has its own pooling
                     "pretrained_weights": PRETRAINED_WEIGHTS,
                     "resnet_mode": resnet_mode,
@@ -413,7 +431,7 @@ def main():
         if args.resnet_mode is None:
             parser.error("--model resnet18 needs --resnet-mode feature_extraction|fine_tuning")
         not_supported = [flag for flag, used in [
-            ("--augmentation", args.augmentation != "none"),
+            ("--augmentation " + args.augmentation, args.augmentation not in RESNET_TRAIN_TRANSFORMS),
             ("--dropout", args.dropout != DROPOUT),
             ("--pooling", args.pooling != "max"),
             ("--loss bce", args.loss != "ce"),

@@ -23,6 +23,9 @@ been evaluated.
 | [CE vs BCE](experiments/07_ce_vs_bce.md) | `loss_bce` | 19 | 0.8816 | 0.8747 | 0.8482 | 0.8568 | BCEWithLogitsLoss on one-hot targets |
 | [ResNet18](experiments/08_resnet.md) | `resnet224_feature_extraction` | 19 | 0.9181 | 0.9081 | 0.9038 | 0.9055 | Pretrained ResNet18, 224x224, backbone frozen, only the head trained |
 | [ResNet18](experiments/08_resnet.md) | `resnet224_fine_tuning` | 8 | 0.9530 | 0.9448 | 0.9421 | 0.9432 | Head only in epochs 1-5, then `layer4` + head |
+| [ResNet18](experiments/08_resnet.md) | `resnet224_ft_aug` | 20 | 0.9605 | 0.9456 | 0.9523 | 0.9482 | Fine-tuning + train-only `full_aug` (224, ImageNet normalization) |
+| [ResNet18](experiments/08_resnet.md) | `resnet224_ft_wd1e4` | 8 | 0.9514 | 0.9435 | 0.9408 | 0.9419 | Fine-tuning + AdamW weight decay 1e-4 |
+| [ResNet18](experiments/08_resnet.md) | `resnet224_ft_plateau` | 8 | 0.9530 | 0.9448 | 0.9421 | 0.9432 | Fine-tuning + ReduceLROnPlateau; lr halved after epochs 11, 15, 19; selected weights identical to `resnet224_fine_tuning` |
 | [ResNet18](experiments/08_resnet.md) | `resnet_feature_extraction` | 7 | 0.8771 | 0.8781 | 0.8592 | 0.8666 | Exploratory run at 128x128 input |
 | [ResNet18](experiments/08_resnet.md) | `resnet_finetuning` | 7 | 0.9241 | 0.9173 | 0.9168 | 0.9165 | Exploratory run at 128x128 input |
 | [Combined](experiments/09_combined_aug_plateau.md) | `combo_aug_plateau` | 18 | 0.8983 | 0.8875 | 0.8844 | 0.8853 | `full_aug` + ReduceLROnPlateau (0.5, 3); lr halved after epochs 13 and 18 |
@@ -31,7 +34,9 @@ been evaluated.
 Experiments 01-05 and 07 each change one factor relative to the baseline setup. Experiment 06
 trains the baseline model on a simulated-imbalance subset of the training split and compares its two
 batch modes with each other. Experiment 08 uses a pretrained ResNet18 with 224x224 input and
-ImageNet normalization and compares feature extraction with fine-tuning. Experiment 09 tests two
+ImageNet normalization and compares feature extraction with fine-tuning; it also records fine-tuning
+with train-only augmentation (`resnet224_ft_aug`), with weight decay (`resnet224_ft_wd1e4`) and with
+a scheduler (`resnet224_ft_plateau`). Experiment 09 tests two
 combinations on the baseline CNN (augmentation + scheduler, then also dropout + weight decay). See
 the linked report for the exact settings, per-class results and limitations.
 
@@ -53,6 +58,9 @@ were not used in this comparison.
 | Best regularized + scheduled [4] | `combo_aug_plateau` | 0.8983 | 0.8875 | 0.8844 | 0.8853 | vanet (0.7692) | vanet (0.7407) |
 | ResNet18 feature extraction | `resnet224_feature_extraction` | 0.9181 | 0.9081 | 0.9038 | 0.9055 | vanet (0.7692) | vanet (0.8000) |
 | ResNet18 fine-tuning | `resnet224_fine_tuning` | 0.9530 | 0.9448 | 0.9421 | 0.9432 | vanet (0.8462) | vanet (0.8462) |
+| ResNet18 fine-tuning + augmentation [5] | `resnet224_ft_aug` | 0.9605 | 0.9456 | 0.9523 | 0.9482 | vanet (0.8846) | vanet (0.7667) |
+| ResNet18 fine-tuning + weight decay [6] | `resnet224_ft_wd1e4` | 0.9514 | 0.9435 | 0.9408 | 0.9419 | vanet (0.8462) | vanet (0.8462) |
+| ResNet18 fine-tuning + scheduler [6] | `resnet224_ft_plateau` | 0.9530 | 0.9448 | 0.9421 | 0.9432 | vanet (0.8462) | vanet (0.8462) |
 
 [1] The baseline is reported with the current validation labels. These include 8 label
 corrections: 7 kamyun -> kamyunet and 1 kamyunet -> kamyun. The metrics were recalculated from
@@ -76,6 +84,20 @@ not two independent candidates for the final model. The production model is a Cr
 selected run, the regularization is augmentation (`full_aug`), combined with ReduceLROnPlateau,
 which halved the learning rate after epochs 13 and 18. Each run was trained once with seed 42. See
 `experiments/09_combined_aug_plateau.md`.
+
+[5] Additional ResNet run, not one of the six rows the assignment requires. It is the same as the
+fine-tuning row except for train-only augmentation `full_aug`, adapted to 224x224 and ImageNet
+normalization. Validation is unchanged (`RESNET_TRANSFORM`, no augmentation). It is recorded
+regardless of its result; no run is removed from this table because it scored better or worse.
+Single run, seed 42. See `experiments/08_resnet.md`.
+
+[6] Additional ResNet runs, not among the six required rows. Each is the same as the fine-tuning
+row except for one factor: AdamW with weight decay 1e-4, or ReduceLROnPlateau. In
+`resnet224_ft_plateau` the learning rate was first reduced after epoch 11. Its best checkpoint
+(epoch 8) is from before that reduction, and its weights are byte-identical to those of
+`resnet224_fine_tuning`, so its row repeats the fine-tuning values. Both runs are recorded
+regardless of their result; no run is removed from this table because it scored better or worse.
+Single runs, seed 42. See `experiments/08_resnet.md`.
 
 ## Other folders
 
