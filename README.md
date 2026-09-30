@@ -109,6 +109,25 @@ Notes on the commands:
   `reports/experiments/13_neysan_predictions.csv`.
 - **Descriptive only.** No precision, F1 or macro metric is reported for this set.
 
+## EfficientNet-B0 comparison
+
+A separate architecture comparison, run after the final model was fixed. The final model stays
+`resnet224_ft_aug`; nothing here changes it, the threshold or `src/predict.py`.
+
+- **Tried:** feature extraction, then partial fine-tuning (the last three feature stages unfrozen from
+  epoch 6), a lower learning rate for those stages, and `full_aug`.
+- **Best run so far:** `effnet_b0_ft_none` (partial fine-tuning, no augmentation), validation accuracy
+  0.9560 and macro F1 0.9485.
+- **Learning rate:** 5e-5 for the fine-tuned stages was not better than the baseline 1e-4 in this setup.
+- **Augmentation:** `full_aug` gave macro F1 0.9466, with no overall improvement over the baseline, so the
+  augmentation is not changed for now.
+- **Scope:** validation only, one seed; the Final Test and the Neysan evaluation were not run again.
+- **Details:** [baseline](reports/experiments/14_efficientnet_b0_ft_baseline.md),
+  [learning rate](reports/experiments/15_efficientnet_b0_ft_lr5e5.md),
+  [`full_aug` review](reports/experiments/16_efficientnet_b0_ft_aug_review.md).
+- **Next question:** a different architecture, such as ConvNeXt-Tiny, could be compared under the same
+  protocol. No result is assumed.
+
 ## Reports
 
 - [Reports index and validation comparison table](reports/README.md)
