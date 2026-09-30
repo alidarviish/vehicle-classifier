@@ -7,6 +7,7 @@ Run from the repository root:
     python -m src.train --run-name effnet_b0_fe_aug --model efficientnet_b0 --augmentation full_aug
     python -m src.train --run-name effnet_b0_ft_none --model efficientnet_b0 --effnet-mode fine_tuning
     python -m src.train --run-name effnet_b0_ft_lr5e5_none --model efficientnet_b0 --effnet-mode fine_tuning --effnet-top-lr 5e-5
+    python -m src.train --run-name convnext_t_fe_none --model convnext_tiny
 
 Only the "train" and "val" rows of data/split_manifest.csv are used.
 The test set is not read anywhere in this file.
@@ -35,7 +36,7 @@ from src.dataset import CLASS_TO_IDX, CLASSES, DEFAULT_CONFIG, DEFAULT_MANIFEST,
 from src.balanced_sampler import BalancedBatchSampler
 from src.model import POOLING_TYPES, BaselineCNN
 from src.resnet import PRETRAINED_WEIGHTS, build_resnet18, count_params, trainable_parts, unfreeze_layer4
-from src import efficientnet
+from src import convnext, efficientnet
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 REPORTS_DIR = REPO_ROOT / "reports"
@@ -105,7 +106,7 @@ AUGMENTATION_PARAMS = {
 # backbone was trained on) and ImageNet normalization. RESNET_TRANSFORM (no augmentation) is always
 # used for validation, and for training unless --augmentation full_aug is given.
 # The baseline keeps IMAGE_SIZE = 128.
-MODELS = ("baseline", "resnet18", "efficientnet_b0")
+MODELS = ("baseline", "resnet18", "efficientnet_b0", "convnext_tiny")
 RESNET_MODES = ("feature_extraction", "fine_tuning")
 RESNET_IMAGE_SIZE = 224
 RESNET_NORM_MEAN = [0.485, 0.456, 0.406]
@@ -154,6 +155,12 @@ EFFNET_TOP_LR = 1e-4             # pretrained features[6:9] in fine-tuning, 10x 
                                  # default of --effnet-top-lr
 EFFNET_TOP_GROUP = "features.6-8"
 EFFNET_RUN_PREFIX = "effnet_b0_"
+
+# ConvNeXt-Tiny: separate comparison experiment (src/convnext.py), feature extraction only.
+# Same 224x224 input, ImageNet normalization and train transforms as ResNet18 / EfficientNet-B0, same
+# head learning rate. Run names must start with CONVNEXT_RUN_PREFIX; existing runs are never overwritten.
+CONVNEXT_HEAD_LR = LEARNING_RATE   # classifier (pretrained LayerNorm2d + new Linear), 1e-3
+CONVNEXT_RUN_PREFIX = "convnext_t_"
 
 DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
@@ -295,11 +302,19 @@ def train(run_name, manifest_path, config_path, epochs=EPOCHS, augmentation="non
                     if p.exists()]
         if existing:
             raise FileExistsError(f"refusing to overwrite existing run files: {[p.name for p in existing]}")
+    is_convnext = model_name == "convnext_tiny"
+    if is_convnext:
+        if not run_name.startswith(CONVNEXT_RUN_PREFIX):
+            raise ValueError(f"ConvNeXt-Tiny run names must start with '{CONVNEXT_RUN_PREFIX}', got '{run_name}'")
+        existing = [p for p in (CHECKPOINT_DIR / f"{run_name}_best.pt", REPORTS_DIR / f"{run_name}_history.csv")
+                    if p.exists()]
+        if existing:
+            raise FileExistsError(f"refusing to overwrite existing run files: {[p.name for p in existing]}")
     set_seed()
     REPORTS_DIR.mkdir(exist_ok=True)
     CHECKPOINT_DIR.mkdir(exist_ok=True)
 
-    if is_resnet or is_effnet:   # both pretrained models: 224x224, ImageNet normalization
+    if is_resnet or is_effnet or is_convnext:   # pretrained models: 224x224, ImageNet normalization
         train_transform, val_transform = RESNET_TRAIN_TRANSFORMS[augmentation], RESNET_TRANSFORM
     else:
         train_transform, val_transform = TRAIN_TRANSFORMS[augmentation], BASE_TRANSFORM
@@ -344,6 +359,14 @@ def train(run_name, manifest_path, config_path, epochs=EPOCHS, augmentation="non
         print(f"model efficientnet_b0 ({efficientnet.PRETRAINED_WEIGHTS}) | mode {effnet_mode} "
               f"| head {model.net.classifier} | trainable {trainable:,} | frozen {frozen:,} | lr per group {group_lrs}"
               + (f" | features[6:9] unfrozen from epoch {FT_WARMUP_EPOCHS + 1}" if effnet_mode == "fine_tuning" else ""))
+    elif is_convnext:
+        model = convnext.build_convnext_tiny(num_classes=len(CLASSES)).to(DEVICE)   # features frozen
+        group_lrs = {"classifier": CONVNEXT_HEAD_LR}
+        param_groups = [{"params": list(model.net.classifier.parameters()), "lr": CONVNEXT_HEAD_LR}]
+        optimizer = OPTIMIZERS[optimizer_name](param_groups, weight_decay=weight_decay)
+        trainable, frozen = convnext.count_params(model)
+        print(f"model convnext_tiny ({convnext.PRETRAINED_WEIGHTS}) | mode feature_extraction "
+              f"| head {model.net.classifier} | trainable {trainable:,} | frozen {frozen:,} | lr per group {group_lrs}")
     else:
         model = BaselineCNN(num_classes=len(CLASSES), image_size=IMAGE_SIZE, dropout=dropout,
                             pooling=pooling).to(DEVICE)
@@ -382,6 +405,8 @@ def train(run_name, manifest_path, config_path, epochs=EPOCHS, augmentation="non
             row["trainable_params"] = efficientnet.count_params(model)[0]
             if effnet_mode == "fine_tuning":
                 row["lr_top"] = optimizer.param_groups[1]["lr"]   # features[6:9] group
+        elif is_convnext:
+            row["trainable_params"] = convnext.count_params(model)[0]
         history.append(row)
         print(f"epoch {epoch:2d} | train_loss {train_m['loss']:.4f} | val_loss {val_m['loss']:.4f} "
               f"| val_acc {val_m['accuracy']:.4f} | val_f1 {val_m['f1']:.4f}")
@@ -450,6 +475,23 @@ def train(run_name, manifest_path, config_path, epochs=EPOCHS, augmentation="non
                     "frozen_params": frozen,
                     "param_group_lrs": group_lrs,
                 })
+            elif is_convnext:
+                trainable, frozen = convnext.count_params(model)
+                checkpoint.update({
+                    "architecture": "ConvNeXt-Tiny",
+                    "image_size": RESNET_IMAGE_SIZE,
+                    "transform": {"resize": [RESNET_IMAGE_SIZE, RESNET_IMAGE_SIZE], "normalize_mean": RESNET_NORM_MEAN,
+                                  "normalize_std": RESNET_NORM_STD, "augmentation": augmentation,
+                                  "augmentation_params": AUGMENTATION_PARAMS[augmentation]},
+                    "dropout": None,   # not used: the ConvNeXt-Tiny classifier has no dropout
+                    "pooling": None,   # not used: ConvNeXt-Tiny has its own pooling
+                    "pretrained_weights": convnext.PRETRAINED_WEIGHTS,
+                    "convnext_mode": "feature_extraction",
+                    "trainable_parts": convnext.trainable_parts(model),
+                    "trainable_params": trainable,
+                    "frozen_params": frozen,
+                    "param_group_lrs": group_lrs,
+                })
             torch.save(checkpoint, checkpoint_path)
             print(f"  -> saved {checkpoint_path.name} (val_f1 {best_f1:.4f})")
 
@@ -492,7 +534,8 @@ def main():
                         help="ce = CrossEntropyLoss (baseline), bce = BCEWithLogitsLoss on one-hot targets")
     parser.add_argument("--model", choices=list(MODELS), default="baseline",
                         help="baseline = BaselineCNN (default), resnet18 = pretrained ResNet18 (needs --resnet-mode), "
-                             f"efficientnet_b0 = pretrained EfficientNet-B0, classifier only (run name '{EFFNET_RUN_PREFIX}...')")
+                             f"efficientnet_b0 = pretrained EfficientNet-B0, classifier only (run name '{EFFNET_RUN_PREFIX}...'), "
+                             f"convnext_tiny = pretrained ConvNeXt-Tiny, classifier only (run name '{CONVNEXT_RUN_PREFIX}...')")
     parser.add_argument("--resnet-mode", choices=list(RESNET_MODES), default=None,
                         help="feature_extraction = only fc trained; fine_tuning = fc, then layer4 from epoch "
                              f"{FT_WARMUP_EPOCHS + 1}")
@@ -516,7 +559,9 @@ def main():
         parser.error("--model resnet18 needs --resnet-mode feature_extraction|fine_tuning")
     if args.model == "efficientnet_b0" and not args.run_name.startswith(EFFNET_RUN_PREFIX):
         parser.error(f"--model efficientnet_b0 needs a run name starting with '{EFFNET_RUN_PREFIX}'")
-    if args.model in ("resnet18", "efficientnet_b0"):
+    if args.model == "convnext_tiny" and not args.run_name.startswith(CONVNEXT_RUN_PREFIX):
+        parser.error(f"--model convnext_tiny needs a run name starting with '{CONVNEXT_RUN_PREFIX}'")
+    if args.model in ("resnet18", "efficientnet_b0", "convnext_tiny"):
         not_supported = [flag for flag, used in [
             ("--augmentation " + args.augmentation, args.augmentation not in RESNET_TRAIN_TRANSFORMS),
             ("--dropout", args.dropout != DROPOUT),
