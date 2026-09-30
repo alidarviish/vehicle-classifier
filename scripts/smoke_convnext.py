@@ -116,6 +116,54 @@ empty = C.build_convnext_tiny(num_classes=8, pretrained=False)
 check("pretrained=False: same state_dict keys and shapes",
       {k: tuple(v.shape) for k, v in empty.state_dict().items()} == {k: tuple(v.shape) for k, v in model.state_dict().items()})
 
+# 5b. fine-tuning: features[6:8] unfrozen, features[0:6] stay frozen and in eval mode (incl. stochastic depth)
+ft = C.build_convnext_tiny(num_classes=8, pretrained=True)
+top = sum(p.numel() for i in C.UNFREEZE_STAGES for p in ft.net.features[i].parameters())
+low = sum(p.numel() for i in range(6) for p in ft.net.features[i].parameters())
+check("UNFREEZE_STAGES == (6, 7)", C.UNFREEZE_STAGES == (6, 7))
+before = C.count_params(ft)
+check("fine-tuning, before unfreeze: trainable 7,688 (classifier)", before[0] == 7688, f"{before[0]:,}")
+C.unfreeze_top_stages(ft)
+after = C.count_params(ft)
+print(f"fine-tuning: before unfreeze trainable {before[0]:,} / frozen {before[1]:,} | after unfreeze trainable "
+      f"{after[0]:,} / frozen {after[1]:,} | features[6:8] {top:,} | features[0:6] {low:,}")
+check("after unfreeze: trainable 15,478,280 = classifier + features[6:8], frozen 12,348,000 = features[0:6]",
+      after == (15478280, 12348000) and after == (7688 + top, low), f"trainable {after[0]:,} | frozen {after[1]:,}")
+check("trainable_parts after unfreeze == ['features.6', 'features.7', 'classifier']",
+      C.trainable_parts(ft) == ["features.6", "features.7", "classifier"], str(C.trainable_parts(ft)))
+top_ids = {id(p) for p in C.top_stage_parameters(ft)}
+check("top_stage_parameters() = exactly the parameters of features[6] and features[7]",
+      top_ids == {id(p) for i in (6, 7) for p in ft.net.features[i].parameters()} and len(top_ids) == len(C.top_stage_parameters(ft)))
+ft.train()
+check("model.train(): features[0:6] (all submodules incl. StochasticDepth) stay in eval",
+      all(not m.training for i in range(6) for m in ft.net.features[i].modules()))
+check("model.train(): features[6:8] (all submodules) in train mode",
+      all(m.training for i in C.UNFREEZE_STAGES for m in ft.net.features[i].modules()))
+check("model.train(): classifier in train mode", ft.net.classifier.training)
+with torch.no_grad():
+    l1, l2 = ft.net.features[:6](x_syn), ft.net.features[:6](x_syn)
+check("model.train(): frozen features[0:6] deterministic (stochastic depth off)", torch.equal(l1, l2))
+torch.manual_seed(0)
+opt_ft = torch.optim.Adam([{"params": list(ft.net.classifier.parameters()), "lr": T.CONVNEXT_HEAD_LR},
+                           {"params": C.top_stage_parameters(ft), "lr": T.CONVNEXT_TOP_LR}])
+low_before = {k: v.clone() for k, v in ft.net.features[:6].state_dict().items()}
+top_before = {i: [p.detach().clone() for p in ft.net.features[i].parameters()] for i in C.UNFREEZE_STAGES}
+cls_before = {k: v.clone() for k, v in ft.net.classifier.state_dict().items()}
+loss = nn.CrossEntropyLoss()(ft(torch.randn(4, 3, 224, 224)), torch.tensor([0, 1, 2, 7]))
+opt_ft.zero_grad(); loss.backward(); opt_ft.step()
+check("one step (fine-tuning): features[0:6] unchanged",
+      all(torch.equal(low_before[k], v) for k, v in ft.net.features[:6].state_dict().items()))
+top_update = {i: max((b - p.detach()).abs().max().item() for b, p in zip(top_before[i], ft.net.features[i].parameters()))
+              for i in C.UNFREEZE_STAGES}
+check("one step (fine-tuning): features[6] and features[7] changed",
+      all(any(not torch.equal(b, p.detach()) for b, p in zip(top_before[i], ft.net.features[i].parameters()))
+          for i in C.UNFREEZE_STAGES),
+      " | ".join(f"features[{i}] max |update| {u:.3e}" for i, u in top_update.items()))
+check("one step (fine-tuning): classifier changed",
+      any(not torch.equal(cls_before[k], v) for k, v in ft.net.classifier.state_dict().items()))
+ft.eval()
+check("model.eval() (fine-tuning): everything in eval mode", all(not m.training for m in ft.modules()))
+
 
 # 6. CLI guards (train() is replaced by a stub, nothing is trained or written)
 def cli(argv):
@@ -159,6 +207,30 @@ status, _ = cli(["--run-name", "effnet_b0_ft_none", "--model", "efficientnet_b0"
 check("regression: efficientnet_b0 fine_tuning still accepted", status == "ok", status)
 status, _ = cli(["--run-name", "convnext_t_x", "--model", "efficientnet_b0"])
 check("regression: efficientnet_b0 with a convnext_t_ run name still rejected", status.startswith("rejected"), status)
+status, args = cli(["--run-name", "convnext_t_ft_none", *cnx, "--convnext-mode", "fine_tuning"])
+check("CLI convnext_tiny --convnext-mode fine_tuning accepted (augmentation none, convnext_mode fine_tuning)",
+      status == "ok" and args is not None and args[4] == "none" and args[13] == "convnext_tiny"
+      and args[17] == "fine_tuning", status)
+status, args = cli(["--run-name", "convnext_t_fe_none", *cnx])
+check("CLI convnext_tiny without --convnext-mode -> feature_extraction",
+      status == "ok" and args is not None and args[17] == "feature_extraction", status)
+for label, argv in [
+    ("--convnext-mode with resnet18", ["--run-name", "x", "--model", "resnet18", "--resnet-mode", "fine_tuning",
+                                       "--convnext-mode", "fine_tuning"]),
+    ("--convnext-mode with efficientnet_b0", ["--run-name", "effnet_b0_x", "--model", "efficientnet_b0",
+                                              "--convnext-mode", "fine_tuning"]),
+    ("--convnext-mode with baseline", ["--run-name", "x", "--convnext-mode", "fine_tuning"]),
+    ("--convnext-mode with an unknown value", ["--run-name", "convnext_t_x", *cnx, "--convnext-mode", "partial"]),
+    ("--effnet-mode with convnext_tiny fine_tuning", ["--run-name", "convnext_t_x", *cnx, "--convnext-mode", "fine_tuning",
+                                                      "--effnet-mode", "fine_tuning"]),
+    ("--effnet-top-lr with convnext_tiny fine_tuning", ["--run-name", "convnext_t_x", *cnx, "--convnext-mode",
+                                                        "fine_tuning", "--effnet-top-lr", "5e-5"]),
+]:
+    status, _ = cli(argv)
+    check(f"CLI rejects {label}", status.startswith("rejected"), status)
+status, args = cli(["--run-name", "effnet_b0_ft_none", "--model", "efficientnet_b0", "--effnet-mode", "fine_tuning"])
+check("regression: efficientnet_b0 train() still gets effnet_mode / effnet_top_lr at the same positions",
+      status == "ok" and args is not None and args[15] == "fine_tuning" and args[16] == T.EFFNET_TOP_LR, status)
 
 
 # 7. train(): name / overwrite guards and the transforms it passes on (stopped before any training)
@@ -207,6 +279,12 @@ with tempfile.TemporaryDirectory() as tmp:
             check("train() refuses to overwrite an existing history", False)
         except FileExistsError:
             check("train() refuses to overwrite an existing history", True)
+        try:
+            T.train("convnext_t_x", T.DEFAULT_MANIFEST, T.DEFAULT_CONFIG, model_name="convnext_tiny",
+                    convnext_mode="partial")
+            check("train() rejects an unknown convnext_mode", False)
+        except ValueError:
+            check("train() rejects an unknown convnext_mode", True)
     finally:
         T.REPORTS_DIR, T.CHECKPOINT_DIR, T.build_loaders = real_reports, real_ckpt, real_loaders
 
@@ -247,6 +325,25 @@ with tempfile.TemporaryDirectory() as tmp:
               and ck["image_size"] == 224 and ck["seed"] == 42,
               str({k: ck[k] for k in ("architecture", "convnext_mode", "trainable_parts", "trainable_params",
                                       "frozen_params", "param_group_lrs")}))
+        check("feature_extraction metadata: warmup_epochs and unfrozen_stages are None",
+              ck["warmup_epochs"] is None and ck["unfrozen_stages"] is None)
+        hist = T.train("convnext_t_ft_smoke", T.DEFAULT_MANIFEST, T.DEFAULT_CONFIG, epochs=6, model_name="convnext_tiny",
+                       convnext_mode="fine_tuning")
+        ck = torch.load(T.CHECKPOINT_DIR / "convnext_t_ft_smoke_best.pt", map_location="cpu", weights_only=True)
+        tp = [r["trainable_params"] for r in hist]
+        check("fine_tuning history: trainable_params 7,688 in epochs 1-5 and 15,478,280 in epoch 6",
+              tp == [7688] * 5 + [15478280], str(tp))
+        check("fine_tuning history: lr_top = 1e-4 and lr (classifier) = 1e-3 in every epoch",
+              [r.get("lr_top") for r in hist] == [1e-4] * 6 and [r["lr"] for r in hist] == [1e-3] * 6)
+        check("fine_tuning checkpoint metadata: mode, warm-up, unfrozen stages, parts, counts, lr groups",
+              ck["architecture"] == "ConvNeXt-Tiny" and ck["convnext_mode"] == "fine_tuning" and ck["warmup_epochs"] == 5
+              and ck["unfrozen_stages"] == [6, 7] and ck["epoch"] == 6
+              and ck["trainable_parts"] == ["features.6", "features.7", "classifier"]
+              and ck["trainable_params"] == 15478280 and ck["frozen_params"] == 12348000
+              and ck["param_group_lrs"] == {"classifier": 1e-3, "features.6-7": 1e-4}
+              and ck["transform"]["augmentation"] == "none",
+              str({k: ck[k] for k in ("convnext_mode", "warmup_epochs", "unfrozen_stages", "trainable_parts",
+                                      "trainable_params", "frozen_params", "param_group_lrs")}))
     finally:
         T.REPORTS_DIR, T.CHECKPOINT_DIR, T.build_loaders, T.run_epoch = real_reports, real_ckpt, real_loaders, real_epoch
 

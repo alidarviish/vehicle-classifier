@@ -8,6 +8,7 @@ Run from the repository root:
     python -m src.train --run-name effnet_b0_ft_none --model efficientnet_b0 --effnet-mode fine_tuning
     python -m src.train --run-name effnet_b0_ft_lr5e5_none --model efficientnet_b0 --effnet-mode fine_tuning --effnet-top-lr 5e-5
     python -m src.train --run-name convnext_t_fe_none --model convnext_tiny
+    python -m src.train --run-name convnext_t_ft_none --model convnext_tiny --convnext-mode fine_tuning
 
 Only the "train" and "val" rows of data/split_manifest.csv are used.
 The test set is not read anywhere in this file.
@@ -156,10 +157,14 @@ EFFNET_TOP_LR = 1e-4             # pretrained features[6:9] in fine-tuning, 10x 
 EFFNET_TOP_GROUP = "features.6-8"
 EFFNET_RUN_PREFIX = "effnet_b0_"
 
-# ConvNeXt-Tiny: separate comparison experiment (src/convnext.py), feature extraction only.
-# Same 224x224 input, ImageNet normalization and train transforms as ResNet18 / EfficientNet-B0, same
-# head learning rate. Run names must start with CONVNEXT_RUN_PREFIX; existing runs are never overwritten.
+# ConvNeXt-Tiny: separate comparison experiment (src/convnext.py).
+# Same 224x224 input, ImageNet normalization and train transforms as ResNet18 / EfficientNet-B0, and the
+# same learning rates and warm-up as their fine-tuning. Run names must start with CONVNEXT_RUN_PREFIX;
+# existing runs are never overwritten.
+CONVNEXT_MODES = ("feature_extraction", "fine_tuning")
 CONVNEXT_HEAD_LR = LEARNING_RATE   # classifier (pretrained LayerNorm2d + new Linear), 1e-3
+CONVNEXT_TOP_LR = 1e-4             # pretrained features[6:8] in fine-tuning, 10x smaller (same as RESNET_LAYER4_LR)
+CONVNEXT_TOP_GROUP = "features.6-7"
 CONVNEXT_RUN_PREFIX = "convnext_t_"
 
 DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -288,7 +293,8 @@ def save_history(history, path):
 def train(run_name, manifest_path, config_path, epochs=EPOCHS, augmentation="none", dropout=DROPOUT,
           pooling="max", optimizer_name="adam", weight_decay=WEIGHT_DECAY, scheduler_name="none",
           train_subset=None, batch_mode="standard", loss_name="ce", model_name="baseline",
-          resnet_mode=None, effnet_mode="feature_extraction", effnet_top_lr=EFFNET_TOP_LR):
+          resnet_mode=None, effnet_mode="feature_extraction", effnet_top_lr=EFFNET_TOP_LR,
+          convnext_mode="feature_extraction"):
     is_resnet = model_name == "resnet18"
     is_effnet = model_name == "efficientnet_b0"
     if is_effnet:
@@ -304,6 +310,8 @@ def train(run_name, manifest_path, config_path, epochs=EPOCHS, augmentation="non
             raise FileExistsError(f"refusing to overwrite existing run files: {[p.name for p in existing]}")
     is_convnext = model_name == "convnext_tiny"
     if is_convnext:
+        if convnext_mode not in CONVNEXT_MODES:
+            raise ValueError(f"convnext_mode must be one of {CONVNEXT_MODES}, got '{convnext_mode}'")
         if not run_name.startswith(CONVNEXT_RUN_PREFIX):
             raise ValueError(f"ConvNeXt-Tiny run names must start with '{CONVNEXT_RUN_PREFIX}', got '{run_name}'")
         existing = [p for p in (CHECKPOINT_DIR / f"{run_name}_best.pt", REPORTS_DIR / f"{run_name}_history.csv")
@@ -361,12 +369,18 @@ def train(run_name, manifest_path, config_path, epochs=EPOCHS, augmentation="non
               + (f" | features[6:9] unfrozen from epoch {FT_WARMUP_EPOCHS + 1}" if effnet_mode == "fine_tuning" else ""))
     elif is_convnext:
         model = convnext.build_convnext_tiny(num_classes=len(CLASSES)).to(DEVICE)   # features frozen
+        # classifier from epoch 1; in fine-tuning the features[6:8] group is in the optimizer from the start,
+        # but its parameters have no gradient (frozen) until epoch 6, so the optimizer skips them
         group_lrs = {"classifier": CONVNEXT_HEAD_LR}
         param_groups = [{"params": list(model.net.classifier.parameters()), "lr": CONVNEXT_HEAD_LR}]
+        if convnext_mode == "fine_tuning":
+            group_lrs[CONVNEXT_TOP_GROUP] = CONVNEXT_TOP_LR
+            param_groups.append({"params": convnext.top_stage_parameters(model), "lr": CONVNEXT_TOP_LR})
         optimizer = OPTIMIZERS[optimizer_name](param_groups, weight_decay=weight_decay)
         trainable, frozen = convnext.count_params(model)
-        print(f"model convnext_tiny ({convnext.PRETRAINED_WEIGHTS}) | mode feature_extraction "
-              f"| head {model.net.classifier} | trainable {trainable:,} | frozen {frozen:,} | lr per group {group_lrs}")
+        print(f"model convnext_tiny ({convnext.PRETRAINED_WEIGHTS}) | mode {convnext_mode} "
+              f"| head {model.net.classifier} | trainable {trainable:,} | frozen {frozen:,} | lr per group {group_lrs}"
+              + (f" | features[6:8] unfrozen from epoch {FT_WARMUP_EPOCHS + 1}" if convnext_mode == "fine_tuning" else ""))
     else:
         model = BaselineCNN(num_classes=len(CLASSES), image_size=IMAGE_SIZE, dropout=dropout,
                             pooling=pooling).to(DEVICE)
@@ -392,6 +406,10 @@ def train(run_name, manifest_path, config_path, epochs=EPOCHS, augmentation="non
             efficientnet.unfreeze_top_stages(model)
             trainable, frozen = efficientnet.count_params(model)
             print(f"epoch {epoch}: features[6:9] unfrozen | trainable {trainable:,} | frozen {frozen:,}")
+        if is_convnext and convnext_mode == "fine_tuning" and epoch == FT_WARMUP_EPOCHS + 1:
+            convnext.unfreeze_top_stages(model)
+            trainable, frozen = convnext.count_params(model)
+            print(f"epoch {epoch}: features[6:8] unfrozen | trainable {trainable:,} | frozen {frozen:,}")
         train_m = run_epoch(model, train_loader, criterion, optimizer, loss_name=loss_name)
         val_m = run_epoch(model, val_loader, criterion, loss_name=loss_name)
 
@@ -407,6 +425,8 @@ def train(run_name, manifest_path, config_path, epochs=EPOCHS, augmentation="non
                 row["lr_top"] = optimizer.param_groups[1]["lr"]   # features[6:9] group
         elif is_convnext:
             row["trainable_params"] = convnext.count_params(model)[0]
+            if convnext_mode == "fine_tuning":
+                row["lr_top"] = optimizer.param_groups[1]["lr"]   # features[6:8] group
         history.append(row)
         print(f"epoch {epoch:2d} | train_loss {train_m['loss']:.4f} | val_loss {val_m['loss']:.4f} "
               f"| val_acc {val_m['accuracy']:.4f} | val_f1 {val_m['f1']:.4f}")
@@ -486,7 +506,9 @@ def train(run_name, manifest_path, config_path, epochs=EPOCHS, augmentation="non
                     "dropout": None,   # not used: the ConvNeXt-Tiny classifier has no dropout
                     "pooling": None,   # not used: ConvNeXt-Tiny has its own pooling
                     "pretrained_weights": convnext.PRETRAINED_WEIGHTS,
-                    "convnext_mode": "feature_extraction",
+                    "convnext_mode": convnext_mode,
+                    "warmup_epochs": FT_WARMUP_EPOCHS if convnext_mode == "fine_tuning" else None,
+                    "unfrozen_stages": list(convnext.UNFREEZE_STAGES) if convnext_mode == "fine_tuning" else None,
                     "trainable_parts": convnext.trainable_parts(model),
                     "trainable_params": trainable,
                     "frozen_params": frozen,
@@ -535,7 +557,7 @@ def main():
     parser.add_argument("--model", choices=list(MODELS), default="baseline",
                         help="baseline = BaselineCNN (default), resnet18 = pretrained ResNet18 (needs --resnet-mode), "
                              f"efficientnet_b0 = pretrained EfficientNet-B0, classifier only (run name '{EFFNET_RUN_PREFIX}...'), "
-                             f"convnext_tiny = pretrained ConvNeXt-Tiny, classifier only (run name '{CONVNEXT_RUN_PREFIX}...')")
+                             f"convnext_tiny = pretrained ConvNeXt-Tiny (run name '{CONVNEXT_RUN_PREFIX}...', see --convnext-mode)")
     parser.add_argument("--resnet-mode", choices=list(RESNET_MODES), default=None,
                         help="feature_extraction = only fc trained; fine_tuning = fc, then layer4 from epoch "
                              f"{FT_WARMUP_EPOCHS + 1}")
@@ -545,7 +567,13 @@ def main():
     parser.add_argument("--effnet-top-lr", type=float, default=None,
                         help=f"efficientnet_b0 fine_tuning only: learning rate of features[6:9] (default {EFFNET_TOP_LR}); "
                              "the classifier keeps its own learning rate")
+    parser.add_argument("--convnext-mode", choices=list(CONVNEXT_MODES), default=None,
+                        help="convnext_tiny only: feature_extraction (default) = only the classifier trained; "
+                             f"fine_tuning = classifier, then features[6:8] from epoch {FT_WARMUP_EPOCHS + 1}")
     args = parser.parse_args()
+    if args.model != "convnext_tiny" and args.convnext_mode is not None:
+        parser.error("--convnext-mode is only used with --model convnext_tiny")
+    convnext_mode = args.convnext_mode or "feature_extraction"
     if args.model != "efficientnet_b0" and args.effnet_mode is not None:
         parser.error("--effnet-mode is only used with --model efficientnet_b0")
     effnet_mode = args.effnet_mode or "feature_extraction"
@@ -580,7 +608,8 @@ def main():
         parser.error("--weight-decay must be >= 0")
     train(args.run_name, args.manifest, args.config, args.epochs, args.augmentation, args.dropout,
           args.pooling, args.optimizer, args.weight_decay, args.scheduler,
-          args.train_subset, args.batch_mode, args.loss, args.model, args.resnet_mode, effnet_mode, effnet_top_lr)
+          args.train_subset, args.batch_mode, args.loss, args.model, args.resnet_mode, effnet_mode, effnet_top_lr,
+          convnext_mode)
 
 
 if __name__ == "__main__":

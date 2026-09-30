@@ -4,12 +4,16 @@ A torchvision ConvNeXt-Tiny with ImageNet weights (IMAGENET1K_V1). The standard 
 (LayerNorm2d(768) -> Flatten -> Linear(768, 1000)) is kept, only its Linear layer is replaced by a new
 8-class layer: classifier = LayerNorm2d(768) -> Flatten -> Linear(768, 8). The model returns raw logits.
 
-Only feature extraction is implemented: the whole backbone (net.features) is frozen and the whole
-net.classifier (the pretrained LayerNorm2d and the new Linear) is trained.
+net.features has 8 parts: features[0] = stem, features[1, 3, 5, 7] = the four stages (3, 3, 9, 3 blocks),
+features[2, 4, 6] = the downsampling layers in between. Two modes (src/train.py decides when to unfreeze):
+- feature extraction: the whole backbone (net.features) is frozen, the whole net.classifier (the pretrained
+  LayerNorm2d and the new Linear) is trained.
+- fine-tuning: the classifier first, then features[6:8] (UNFREEZE_STAGES: the last downsampling layer and
+  the last stage, like layer4 in ResNet18) as well; features[0:6] always stay frozen.
 
 Frozen stages are kept in eval mode, also when model.train() is called, so stochastic depth is off in
 the frozen blocks (ConvNeXt uses LayerNorm, not BatchNorm; the rule is the same as in src/resnet.py
-and src/efficientnet.py, checked stage by stage).
+and src/efficientnet.py, checked stage by stage). Unfrozen stages follow model.train() / model.eval().
 
 This model is not used by src/predict.py; the final model of the project stays ResNet18.
 """
@@ -20,6 +24,7 @@ from torchvision import models
 NUM_CLASSES = 8
 PRETRAINED_WEIGHTS = "IMAGENET1K_V1"
 FEATURE_DIM = 768          # output channels of the last ConvNeXt-Tiny stage
+UNFREEZE_STAGES = (6, 7)   # fine-tuning: the last downsampling layer and the last stage of net.features
 
 
 def set_trainable(module, trainable):
@@ -69,8 +74,19 @@ def freeze_backbone(model):
     set_trainable(model.net.classifier, True)
 
 
+def top_stage_parameters(model):
+    """Parameters of features[6:8], the parts that fine-tuning unfreezes (for the optimizer)."""
+    return [p for i in UNFREEZE_STAGES for p in model.net.features[i].parameters()]
+
+
+def unfreeze_top_stages(model):
+    """Fine-tuning: features[6:8] become trainable too (features[0:6] stay frozen)."""
+    for i in UNFREEZE_STAGES:
+        set_trainable(model.net.features[i], True)
+
+
 def trainable_parts(model):
-    """Names of the parts that are trained, e.g. ["classifier"]."""
+    """Names of the parts that are trained, e.g. ["classifier"] or ["features.6", "features.7", "classifier"]."""
     parts = [f"features.{i}" for i, stage in enumerate(model.net.features) if is_trainable(stage)]
     return parts + (["classifier"] if is_trainable(model.net.classifier) else [])
 
