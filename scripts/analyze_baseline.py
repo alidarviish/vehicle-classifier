@@ -9,8 +9,8 @@ Run from the repository root:
     python scripts/analyze_baseline.py --history-only               # curves only, no torch needed
 
 Reads reports/<run_name>_history.csv and checkpoints/<run_name>_best.pt.
-Evaluation uses BASE_TRANSFORM for BaselineCNN and, for ResNet18, EfficientNet-B0 and ConvNeXt-Tiny
-checkpoints, the resize and ImageNet normalization recorded in the checkpoint - never augmentation - and
+Evaluation uses BASE_TRANSFORM for BaselineCNN and, for ResNet18, EfficientNet-B0, ConvNeXt-Tiny and
+Swin-Tiny checkpoints, the resize and ImageNet normalization recorded in the checkpoint - never augmentation - and
 the current labels in data/split_manifest.csv.
 
 Outputs (all generated, ignored by git) in reports/analysis/<run_name>/ for every run,
@@ -36,7 +36,8 @@ if str(REPO_ROOT) not in sys.path:
 
 DEFAULT_RUN = "baseline"
 EVAL_TRANSFORM_NAMES = {"BaselineCNN": "BASE_TRANSFORM", "ResNet18": "RESNET_TRANSFORM",
-                        "EfficientNet-B0": "RESNET_TRANSFORM", "ConvNeXt-Tiny": "RESNET_TRANSFORM"}
+                        "EfficientNet-B0": "RESNET_TRANSFORM", "ConvNeXt-Tiny": "RESNET_TRANSFORM",
+                        "Swin-Tiny": "RESNET_TRANSFORM"}
 
 
 def run_paths(run_name):
@@ -163,6 +164,13 @@ def evaluate_checkpoint(checkpoint_path, config_path):
         from src.convnext import build_convnext_tiny
         # separate comparison experiment; built empty, all weights come from the checkpoint
         model = build_convnext_tiny(num_classes=len(CLASSES), pretrained=False)
+        recorded = checkpoint["transform"]
+        eval_transform = resnet_transform(recorded["resize"][0], recorded["normalize_mean"],
+                                          recorded["normalize_std"])
+    elif checkpoint["architecture"] == "Swin-Tiny":
+        from src.swin import build_swin_tiny
+        # separate comparison experiment; built empty, all weights come from the checkpoint
+        model = build_swin_tiny(num_classes=len(CLASSES), pretrained=False)
         recorded = checkpoint["transform"]
         eval_transform = resnet_transform(recorded["resize"][0], recorded["normalize_mean"],
                                           recorded["normalize_std"])

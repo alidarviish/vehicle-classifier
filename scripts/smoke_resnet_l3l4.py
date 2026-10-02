@@ -72,6 +72,15 @@ def snapshot():
     return snap
 
 
+def run_artifacts(run_name):
+    """(size, mtime) of the run's checkpoint and history, None if missing (a real run may already exist)."""
+    state = {}
+    for path in (REPO / "checkpoints" / f"{run_name}_best.pt", REPO / "reports" / f"{run_name}_history.csv"):
+        st = path.stat() if path.exists() else None
+        state[path.name] = (st.st_size, st.st_mtime_ns) if st else None
+    return state
+
+
 def new_model():
     torch.manual_seed(SEED)
     return build_resnet18(num_classes=len(CLASS_TO_IDX), pretrained=False)
@@ -115,6 +124,7 @@ PARTS = ("conv1", "bn1", "layer1", "layer2", "layer3", "layer4", "fc")
 # ---------- 0. protected files ----------
 final_before = sha(FINAL_CKPT)
 files_before = snapshot()
+new_run_before = run_artifacts(NEW_RUN)
 check("final checkpoint resnet224_ft_aug_best.pt SHA256 before", final_before == FINAL_SHA, final_before[:16])
 
 # ---------- 1. API and constants ----------
@@ -326,9 +336,8 @@ check("final checkpoint SHA256 after = before", final_after == final_before, fin
 files_after = snapshot()
 diff = sorted(set(files_before.items()) ^ set(files_after.items()))
 check("no file created or changed in checkpoints/ or reports/", not diff, f"{diff[:3]}")
-check(f"no artifact of '{NEW_RUN}' exists",
-      not (REPO / "checkpoints" / f"{NEW_RUN}_best.pt").exists()
-      and not (REPO / "reports" / f"{NEW_RUN}_history.csv").exists())
+check(f"artifacts of '{NEW_RUN}' not created or changed by this test (an earlier real run is allowed)",
+      run_artifacts(NEW_RUN) == new_run_before, f"{new_run_before}")
 
 print(f"\nfinal checkpoint SHA256 before {final_before}\nfinal checkpoint SHA256 after  {final_after}")
 print(f"\n{sum(results)}/{len(results)} checks passed (no training, no data, Test and Neysan not read)")

@@ -10,6 +10,7 @@ Run from the repository root:
     python -m src.train --run-name effnet_b0_ft_lr5e5_none --model efficientnet_b0 --effnet-mode fine_tuning --effnet-top-lr 5e-5
     python -m src.train --run-name convnext_t_fe_none --model convnext_tiny
     python -m src.train --run-name convnext_t_ft_none --model convnext_tiny --convnext-mode fine_tuning
+    python -m src.train --run-name swin_t_fe_none --model swin_tiny
 
 Only the "train" and "val" rows of data/split_manifest.csv are used.
 The test set is not read anywhere in this file.
@@ -38,7 +39,7 @@ from src.dataset import CLASS_TO_IDX, CLASSES, DEFAULT_CONFIG, DEFAULT_MANIFEST,
 from src.balanced_sampler import BalancedBatchSampler
 from src.model import POOLING_TYPES, BaselineCNN
 from src.resnet import PRETRAINED_WEIGHTS, build_resnet18, count_params, trainable_parts, unfreeze_layers
-from src import convnext, efficientnet
+from src import convnext, efficientnet, swin
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 REPORTS_DIR = REPO_ROOT / "reports"
@@ -108,7 +109,7 @@ AUGMENTATION_PARAMS = {
 # backbone was trained on) and ImageNet normalization. RESNET_TRANSFORM (no augmentation) is always
 # used for validation, and for training unless --augmentation full_aug is given.
 # The baseline keeps IMAGE_SIZE = 128.
-MODELS = ("baseline", "resnet18", "efficientnet_b0", "convnext_tiny")
+MODELS = ("baseline", "resnet18", "efficientnet_b0", "convnext_tiny", "swin_tiny")
 RESNET_MODES = ("feature_extraction", "fine_tuning")
 RESNET_IMAGE_SIZE = 224
 RESNET_NORM_MEAN = [0.485, 0.456, 0.406]
@@ -171,6 +172,14 @@ CONVNEXT_HEAD_LR = LEARNING_RATE   # classifier (pretrained LayerNorm2d + new Li
 CONVNEXT_TOP_LR = 1e-4             # pretrained features[6:8] in fine-tuning, 10x smaller (same as RESNET_LAYER4_LR)
 CONVNEXT_TOP_GROUP = "features.6-7"
 CONVNEXT_RUN_PREFIX = "convnext_t_"
+
+# Swin-Tiny: separate comparison experiment (src/swin.py), feature extraction only (no fine-tuning mode).
+# Same 224x224 input, ImageNet normalization and train transforms as ResNet18 / EfficientNet-B0 /
+# ConvNeXt-Tiny (the project transform, not the preset of Swin_T_Weights). One optimizer group: the head.
+# Run names must start with SWIN_RUN_PREFIX; existing runs are never overwritten.
+SWIN_MODE = "feature_extraction"
+SWIN_HEAD_LR = LEARNING_RATE   # new 8-class head (Linear(768, 8)), 1e-3
+SWIN_RUN_PREFIX = "swin_t_"
 
 DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
@@ -336,6 +345,35 @@ def resnet_checkpoint_metadata(model, resnet_mode, resnet_ft_layers, group_lrs):
     }
 
 
+def swin_param_groups(model):
+    """Optimizer groups for --model swin_tiny: exactly one group, the head. Returns (param_groups, {group name: lr})."""
+    group_lrs = {"head": SWIN_HEAD_LR}
+    param_groups = [{"params": list(model.net.head.parameters()), "lr": SWIN_HEAD_LR}]
+    return param_groups, group_lrs
+
+
+def swin_checkpoint_metadata(model, group_lrs, augmentation):
+    """Swin-Tiny-specific checkpoint keys (plain Python values only)."""
+    trainable, frozen = swin.count_params(model)
+    return {
+        "architecture": "Swin-Tiny",
+        "image_size": RESNET_IMAGE_SIZE,
+        "transform": {"resize": [RESNET_IMAGE_SIZE, RESNET_IMAGE_SIZE], "normalize_mean": RESNET_NORM_MEAN,
+                      "normalize_std": RESNET_NORM_STD, "augmentation": augmentation,
+                      "augmentation_params": AUGMENTATION_PARAMS[augmentation]},
+        "dropout": None,   # not used: the new head has no dropout
+        "pooling": None,   # not used: Swin-Tiny has its own pooling
+        "pretrained_weights": swin.PRETRAINED_WEIGHTS,
+        "swin_mode": SWIN_MODE,
+        "warmup_epochs": None,
+        "unfrozen_stages": None,
+        "trainable_parts": swin.trainable_parts(model),
+        "trainable_params": trainable,
+        "frozen_params": frozen,
+        "param_group_lrs": dict(group_lrs),
+    }
+
+
 def save_history(history, path):
     with open(path, "w", newline="", encoding="utf-8") as f:
         writer = csv.DictWriter(f, fieldnames=list(history[0].keys()))
@@ -370,11 +408,16 @@ def train(run_name, manifest_path, config_path, epochs=EPOCHS, augmentation="non
         if not run_name.startswith(CONVNEXT_RUN_PREFIX):
             raise ValueError(f"ConvNeXt-Tiny run names must start with '{CONVNEXT_RUN_PREFIX}', got '{run_name}'")
         refuse_existing_run(run_name)
+    is_swin = model_name == "swin_tiny"
+    if is_swin:
+        if not run_name.startswith(SWIN_RUN_PREFIX):
+            raise ValueError(f"Swin-Tiny run names must start with '{SWIN_RUN_PREFIX}', got '{run_name}'")
+        refuse_existing_run(run_name)
     set_seed()
     REPORTS_DIR.mkdir(exist_ok=True)
     CHECKPOINT_DIR.mkdir(exist_ok=True)
 
-    if is_resnet or is_effnet or is_convnext:   # pretrained models: 224x224, ImageNet normalization
+    if is_resnet or is_effnet or is_convnext or is_swin:   # pretrained models: 224x224, ImageNet normalization
         train_transform, val_transform = RESNET_TRAIN_TRANSFORMS[augmentation], RESNET_TRANSFORM
     else:
         train_transform, val_transform = TRAIN_TRANSFORMS[augmentation], BASE_TRANSFORM
@@ -430,6 +473,13 @@ def train(run_name, manifest_path, config_path, epochs=EPOCHS, augmentation="non
         print(f"model convnext_tiny ({convnext.PRETRAINED_WEIGHTS}) | mode {convnext_mode} "
               f"| head {model.net.classifier} | trainable {trainable:,} | frozen {frozen:,} | lr per group {group_lrs}"
               + (f" | features[6:8] unfrozen from epoch {FT_WARMUP_EPOCHS + 1}" if convnext_mode == "fine_tuning" else ""))
+    elif is_swin:
+        model = swin.build_swin_tiny(num_classes=len(CLASSES)).to(DEVICE)   # features and norm frozen
+        param_groups, group_lrs = swin_param_groups(model)   # head only, the whole run
+        optimizer = OPTIMIZERS[optimizer_name](param_groups, weight_decay=weight_decay)
+        trainable, frozen = swin.count_params(model)
+        print(f"model swin_tiny ({swin.PRETRAINED_WEIGHTS}) | mode {SWIN_MODE} | head {model.net.head} "
+              f"| trainable {trainable:,} | frozen {frozen:,} | lr per group {group_lrs}")
     else:
         model = BaselineCNN(num_classes=len(CLASSES), image_size=IMAGE_SIZE, dropout=dropout,
                             pooling=pooling).to(DEVICE)
@@ -476,6 +526,8 @@ def train(run_name, manifest_path, config_path, epochs=EPOCHS, augmentation="non
             row["trainable_params"] = convnext.count_params(model)[0]
             if convnext_mode == "fine_tuning":
                 row["lr_top"] = optimizer.param_groups[1]["lr"]   # features[6:8] group
+        elif is_swin:
+            row["trainable_params"] = swin.count_params(model)[0]
         history.append(row)
         print(f"epoch {epoch:2d} | train_loss {train_m['loss']:.4f} | val_loss {val_m['loss']:.4f} "
               f"| val_acc {val_m['accuracy']:.4f} | val_f1 {val_m['f1']:.4f}")
@@ -556,6 +608,8 @@ def train(run_name, manifest_path, config_path, epochs=EPOCHS, augmentation="non
                     "frozen_params": frozen,
                     "param_group_lrs": group_lrs,
                 })
+            elif is_swin:
+                checkpoint.update(swin_checkpoint_metadata(model, group_lrs, augmentation))
             torch.save(checkpoint, checkpoint_path)
             print(f"  -> saved {checkpoint_path.name} (val_f1 {best_f1:.4f})")
 
@@ -599,7 +653,8 @@ def main():
     parser.add_argument("--model", choices=list(MODELS), default="baseline",
                         help="baseline = BaselineCNN (default), resnet18 = pretrained ResNet18 (needs --resnet-mode), "
                              f"efficientnet_b0 = pretrained EfficientNet-B0, classifier only (run name '{EFFNET_RUN_PREFIX}...'), "
-                             f"convnext_tiny = pretrained ConvNeXt-Tiny (run name '{CONVNEXT_RUN_PREFIX}...', see --convnext-mode)")
+                             f"convnext_tiny = pretrained ConvNeXt-Tiny (run name '{CONVNEXT_RUN_PREFIX}...', see --convnext-mode), "
+                             f"swin_tiny = pretrained Swin-Tiny, head only (run name '{SWIN_RUN_PREFIX}...')")
     parser.add_argument("--resnet-mode", choices=list(RESNET_MODES), default=None,
                         help="feature_extraction = only fc trained; fine_tuning = fc, then layer4 (or the layers of "
                              f"--resnet-ft-layers) from epoch {FT_WARMUP_EPOCHS + 1}")
@@ -635,7 +690,9 @@ def main():
         parser.error(f"--model efficientnet_b0 needs a run name starting with '{EFFNET_RUN_PREFIX}'")
     if args.model == "convnext_tiny" and not args.run_name.startswith(CONVNEXT_RUN_PREFIX):
         parser.error(f"--model convnext_tiny needs a run name starting with '{CONVNEXT_RUN_PREFIX}'")
-    if args.model in ("resnet18", "efficientnet_b0", "convnext_tiny"):
+    if args.model == "swin_tiny" and not args.run_name.startswith(SWIN_RUN_PREFIX):
+        parser.error(f"--model swin_tiny needs a run name starting with '{SWIN_RUN_PREFIX}'")
+    if args.model in ("resnet18", "efficientnet_b0", "convnext_tiny", "swin_tiny"):
         not_supported = [flag for flag, used in [
             ("--augmentation " + args.augmentation, args.augmentation not in RESNET_TRAIN_TRANSFORMS),
             ("--dropout", args.dropout != DROPOUT),
