@@ -4,6 +4,7 @@ Run from the repository root:
     python -m src.train
     python -m src.train --config configs/local_paths.json
     python -m src.train --run-name resnet_feature_extraction --model resnet18 --resnet-mode feature_extraction
+    python -m src.train --run-name resnet224_ft_l3l4_aug --model resnet18 --resnet-mode fine_tuning --resnet-ft-layers layer3_layer4 --augmentation full_aug
     python -m src.train --run-name effnet_b0_fe_aug --model efficientnet_b0 --augmentation full_aug
     python -m src.train --run-name effnet_b0_ft_none --model efficientnet_b0 --effnet-mode fine_tuning
     python -m src.train --run-name effnet_b0_ft_lr5e5_none --model efficientnet_b0 --effnet-mode fine_tuning --effnet-top-lr 5e-5
@@ -36,7 +37,7 @@ from torchvision import transforms
 from src.dataset import CLASS_TO_IDX, CLASSES, DEFAULT_CONFIG, DEFAULT_MANIFEST, VehicleDataset
 from src.balanced_sampler import BalancedBatchSampler
 from src.model import POOLING_TYPES, BaselineCNN
-from src.resnet import PRETRAINED_WEIGHTS, build_resnet18, count_params, trainable_parts, unfreeze_layer4
+from src.resnet import PRETRAINED_WEIGHTS, build_resnet18, count_params, trainable_parts, unfreeze_layers
 from src import convnext, efficientnet
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
@@ -144,6 +145,10 @@ RESNET_TRAIN_TRANSFORMS = {"none": RESNET_TRANSFORM, "full_aug": resnet_full_aug
 RESNET_HEAD_LR = LEARNING_RATE   # new 8-class head (fc), 1e-3
 RESNET_LAYER4_LR = 1e-4          # pretrained layer4, 10x smaller
 FT_WARMUP_EPOCHS = 5             # fine-tuning: fc only in epochs 1-5, layer4 unfrozen from epoch 6
+# fine-tuning depth (--resnet-ft-layers): layers unfrozen after the warm-up, each with RESNET_LAYER4_LR.
+# "layer4" is the default and the setup of the final model; "layer3_layer4" also unfreezes layer3.
+RESNET_FT_LAYERS = {"layer4": ("layer4",), "layer3_layer4": ("layer3", "layer4")}
+RESNET_DEFAULT_FT_LAYERS = "layer4"
 
 # EfficientNet-B0: separate comparison experiment (src/efficientnet.py).
 # It uses the same 224x224 input, ImageNet normalization and train transforms as ResNet18, and the
@@ -283,6 +288,54 @@ def run_epoch(model, loader, criterion, optimizer=None, loss_name="ce"):
     }
 
 
+def refuse_existing_run(run_name):
+    """Stop before anything is written if the run's checkpoint or history already exists."""
+    existing = [p for p in (CHECKPOINT_DIR / f"{run_name}_best.pt", REPORTS_DIR / f"{run_name}_history.csv")
+                if p.exists()]
+    if existing:
+        raise FileExistsError(f"refusing to overwrite existing run files: {[p.name for p in existing]}")
+
+
+def check_resnet_ft_layers(resnet_mode, resnet_ft_layers):
+    if resnet_ft_layers not in RESNET_FT_LAYERS:
+        raise ValueError(f"resnet_ft_layers must be one of {tuple(RESNET_FT_LAYERS)}, got '{resnet_ft_layers}'")
+    if resnet_ft_layers != RESNET_DEFAULT_FT_LAYERS and resnet_mode != "fine_tuning":
+        raise ValueError(f"resnet_ft_layers '{resnet_ft_layers}' needs resnet_mode 'fine_tuning', got '{resnet_mode}'")
+
+
+def resnet_param_groups(model, resnet_mode, resnet_ft_layers=RESNET_DEFAULT_FT_LAYERS):
+    """Optimizer groups for --model resnet18: fc; in fine-tuning also one group per layer to unfreeze.
+
+    All groups are in the optimizer from the start; the layer parameters have no gradient (frozen)
+    until the warm-up ends, so the optimizer skips them. Returns (param_groups, {group name: lr}).
+    """
+    check_resnet_ft_layers(resnet_mode, resnet_ft_layers)
+    group_lrs = {"fc": RESNET_HEAD_LR}
+    param_groups = [{"params": list(model.net.fc.parameters()), "lr": RESNET_HEAD_LR}]
+    if resnet_mode == "fine_tuning":
+        for name in RESNET_FT_LAYERS[resnet_ft_layers]:
+            group_lrs[name] = RESNET_LAYER4_LR
+            param_groups.append({"params": list(getattr(model.net, name).parameters()), "lr": RESNET_LAYER4_LR})
+    return param_groups, group_lrs
+
+
+def resnet_checkpoint_metadata(model, resnet_mode, resnet_ft_layers, group_lrs):
+    """ResNet18-specific checkpoint keys (plain Python values only)."""
+    trainable, frozen = count_params(model)
+    fine_tuning = resnet_mode == "fine_tuning"
+    return {
+        "pretrained_weights": PRETRAINED_WEIGHTS,
+        "resnet_mode": resnet_mode,
+        "resnet_ft_layers": resnet_ft_layers if fine_tuning else None,
+        "unfrozen_layers": list(RESNET_FT_LAYERS[resnet_ft_layers]) if fine_tuning else None,
+        "warmup_epochs": FT_WARMUP_EPOCHS if fine_tuning else None,
+        "trainable_parts": trainable_parts(model),
+        "trainable_params": trainable,
+        "frozen_params": frozen,
+        "param_group_lrs": dict(group_lrs),
+    }
+
+
 def save_history(history, path):
     with open(path, "w", newline="", encoding="utf-8") as f:
         writer = csv.DictWriter(f, fieldnames=list(history[0].keys()))
@@ -294,8 +347,13 @@ def train(run_name, manifest_path, config_path, epochs=EPOCHS, augmentation="non
           pooling="max", optimizer_name="adam", weight_decay=WEIGHT_DECAY, scheduler_name="none",
           train_subset=None, batch_mode="standard", loss_name="ce", model_name="baseline",
           resnet_mode=None, effnet_mode="feature_extraction", effnet_top_lr=EFFNET_TOP_LR,
-          convnext_mode="feature_extraction"):
+          convnext_mode="feature_extraction", resnet_ft_layers=RESNET_DEFAULT_FT_LAYERS):
     is_resnet = model_name == "resnet18"
+    if is_resnet:
+        check_resnet_ft_layers(resnet_mode, resnet_ft_layers)
+        refuse_existing_run(run_name)   # never overwrite an earlier ResNet18 run (incl. the final model)
+    elif resnet_ft_layers != RESNET_DEFAULT_FT_LAYERS:
+        raise ValueError("resnet_ft_layers is only used with model_name 'resnet18'")
     is_effnet = model_name == "efficientnet_b0"
     if is_effnet:
         if effnet_mode not in EFFNET_MODES:
@@ -304,20 +362,14 @@ def train(run_name, manifest_path, config_path, epochs=EPOCHS, augmentation="non
             raise ValueError(f"effnet_top_lr must be > 0, got {effnet_top_lr}")
         if not run_name.startswith(EFFNET_RUN_PREFIX):
             raise ValueError(f"EfficientNet-B0 run names must start with '{EFFNET_RUN_PREFIX}', got '{run_name}'")
-        existing = [p for p in (CHECKPOINT_DIR / f"{run_name}_best.pt", REPORTS_DIR / f"{run_name}_history.csv")
-                    if p.exists()]
-        if existing:
-            raise FileExistsError(f"refusing to overwrite existing run files: {[p.name for p in existing]}")
+        refuse_existing_run(run_name)
     is_convnext = model_name == "convnext_tiny"
     if is_convnext:
         if convnext_mode not in CONVNEXT_MODES:
             raise ValueError(f"convnext_mode must be one of {CONVNEXT_MODES}, got '{convnext_mode}'")
         if not run_name.startswith(CONVNEXT_RUN_PREFIX):
             raise ValueError(f"ConvNeXt-Tiny run names must start with '{CONVNEXT_RUN_PREFIX}', got '{run_name}'")
-        existing = [p for p in (CHECKPOINT_DIR / f"{run_name}_best.pt", REPORTS_DIR / f"{run_name}_history.csv")
-                    if p.exists()]
-        if existing:
-            raise FileExistsError(f"refusing to overwrite existing run files: {[p.name for p in existing]}")
+        refuse_existing_run(run_name)
     set_seed()
     REPORTS_DIR.mkdir(exist_ok=True)
     CHECKPOINT_DIR.mkdir(exist_ok=True)
@@ -341,18 +393,15 @@ def train(run_name, manifest_path, config_path, epochs=EPOCHS, augmentation="non
     criterion = build_criterion(loss_name)
     if is_resnet:
         model = build_resnet18(num_classes=len(CLASSES)).to(DEVICE)   # backbone frozen, fc trainable
-        # fc from epoch 1; in fine-tuning the layer4 group is in the optimizer from the start,
-        # but its parameters have no gradient (frozen) until epoch 6, so the optimizer skips them
-        group_lrs = {"fc": RESNET_HEAD_LR}
-        param_groups = [{"params": list(model.net.fc.parameters()), "lr": RESNET_HEAD_LR}]
-        if resnet_mode == "fine_tuning":
-            group_lrs["layer4"] = RESNET_LAYER4_LR
-            param_groups.append({"params": list(model.net.layer4.parameters()), "lr": RESNET_LAYER4_LR})
+        # fc from epoch 1; in fine-tuning the layer groups (layer4, or layer3 + layer4) are in the optimizer
+        # from the start, but their parameters have no gradient (frozen) until epoch 6, so the optimizer skips them
+        param_groups, group_lrs = resnet_param_groups(model, resnet_mode, resnet_ft_layers)
         optimizer = OPTIMIZERS[optimizer_name](param_groups, weight_decay=weight_decay)
         trainable, frozen = count_params(model)
+        ft_names = " + ".join(RESNET_FT_LAYERS[resnet_ft_layers])
         print(f"model resnet18 ({PRETRAINED_WEIGHTS}) | mode {resnet_mode} | trainable {trainable:,} "
               f"| frozen {frozen:,} | lr per group {group_lrs}"
-              + (f" | layer4 unfrozen from epoch {FT_WARMUP_EPOCHS + 1}" if resnet_mode == "fine_tuning" else ""))
+              + (f" | {ft_names} unfrozen from epoch {FT_WARMUP_EPOCHS + 1}" if resnet_mode == "fine_tuning" else ""))
     elif is_effnet:
         model = efficientnet.build_efficientnet_b0(num_classes=len(CLASSES)).to(DEVICE)   # features frozen
         # classifier from epoch 1; in fine-tuning the features[6:9] group is in the optimizer from the start,
@@ -399,9 +448,9 @@ def train(run_name, manifest_path, config_path, epochs=EPOCHS, augmentation="non
         if batch_mode == "balanced":
             train_loader.batch_sampler.set_epoch(epoch)
         if is_resnet and resnet_mode == "fine_tuning" and epoch == FT_WARMUP_EPOCHS + 1:
-            unfreeze_layer4(model)
+            unfreeze_layers(model, RESNET_FT_LAYERS[resnet_ft_layers])
             trainable, frozen = count_params(model)
-            print(f"epoch {epoch}: layer4 unfrozen | trainable {trainable:,} | frozen {frozen:,}")
+            print(f"epoch {epoch}: {ft_names} unfrozen | trainable {trainable:,} | frozen {frozen:,}")
         if is_effnet and effnet_mode == "fine_tuning" and epoch == FT_WARMUP_EPOCHS + 1:
             efficientnet.unfreeze_top_stages(model)
             trainable, frozen = efficientnet.count_params(model)
@@ -460,7 +509,6 @@ def train(run_name, manifest_path, config_path, epochs=EPOCHS, augmentation="non
                 "val_f1": float(best_f1),   # plain float, so the checkpoint loads with torch.load(weights_only=True)
             }
             if is_resnet:
-                trainable, frozen = count_params(model)
                 checkpoint.update({
                     "architecture": "ResNet18",
                     "image_size": RESNET_IMAGE_SIZE,
@@ -468,13 +516,7 @@ def train(run_name, manifest_path, config_path, epochs=EPOCHS, augmentation="non
                                   "normalize_std": RESNET_NORM_STD, "augmentation": augmentation,
                                   "augmentation_params": AUGMENTATION_PARAMS[augmentation]},
                     "pooling": None,   # not used: ResNet18 has its own pooling
-                    "pretrained_weights": PRETRAINED_WEIGHTS,
-                    "resnet_mode": resnet_mode,
-                    "warmup_epochs": FT_WARMUP_EPOCHS if resnet_mode == "fine_tuning" else None,
-                    "trainable_parts": trainable_parts(model),
-                    "trainable_params": trainable,
-                    "frozen_params": frozen,
-                    "param_group_lrs": group_lrs,
+                    **resnet_checkpoint_metadata(model, resnet_mode, resnet_ft_layers, group_lrs),
                 })
             elif is_effnet:
                 trainable, frozen = efficientnet.count_params(model)
@@ -559,8 +601,12 @@ def main():
                              f"efficientnet_b0 = pretrained EfficientNet-B0, classifier only (run name '{EFFNET_RUN_PREFIX}...'), "
                              f"convnext_tiny = pretrained ConvNeXt-Tiny (run name '{CONVNEXT_RUN_PREFIX}...', see --convnext-mode)")
     parser.add_argument("--resnet-mode", choices=list(RESNET_MODES), default=None,
-                        help="feature_extraction = only fc trained; fine_tuning = fc, then layer4 from epoch "
-                             f"{FT_WARMUP_EPOCHS + 1}")
+                        help="feature_extraction = only fc trained; fine_tuning = fc, then layer4 (or the layers of "
+                             f"--resnet-ft-layers) from epoch {FT_WARMUP_EPOCHS + 1}")
+    parser.add_argument("--resnet-ft-layers", choices=list(RESNET_FT_LAYERS), default=None,
+                        help=f"resnet18 fine_tuning only: layers unfrozen from epoch {FT_WARMUP_EPOCHS + 1} "
+                             f"(default {RESNET_DEFAULT_FT_LAYERS}; layer3_layer4 = layer3 and layer4, "
+                             f"each with learning rate {RESNET_LAYER4_LR})")
     parser.add_argument("--effnet-mode", choices=list(EFFNET_MODES), default=None,
                         help="efficientnet_b0 only: feature_extraction (default) = only the classifier trained; "
                              f"fine_tuning = classifier, then features[6:9] from epoch {FT_WARMUP_EPOCHS + 1}")
@@ -602,6 +648,9 @@ def main():
             parser.error(f"not supported with --model {args.model}: {', '.join(not_supported)}")
     if args.model != "resnet18" and args.resnet_mode is not None:
         parser.error("--resnet-mode is only used with --model resnet18")
+    if args.resnet_ft_layers is not None and (args.model != "resnet18" or args.resnet_mode != "fine_tuning"):
+        parser.error("--resnet-ft-layers is only used with --model resnet18 --resnet-mode fine_tuning")
+    resnet_ft_layers = args.resnet_ft_layers or RESNET_DEFAULT_FT_LAYERS
     if not 0.0 <= args.dropout < 1.0:
         parser.error("--dropout must be in [0, 1)")
     if args.weight_decay < 0.0:
@@ -609,7 +658,7 @@ def main():
     train(args.run_name, args.manifest, args.config, args.epochs, args.augmentation, args.dropout,
           args.pooling, args.optimizer, args.weight_decay, args.scheduler,
           args.train_subset, args.batch_mode, args.loss, args.model, args.resnet_mode, effnet_mode, effnet_top_lr,
-          convnext_mode)
+          convnext_mode, resnet_ft_layers)
 
 
 if __name__ == "__main__":

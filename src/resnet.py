@@ -5,7 +5,9 @@ A torchvision ResNet18 with ImageNet weights (IMAGENET1K_V1) and a new 8-class h
 
 - feature extraction: only fc is trainable, the whole backbone is frozen.
 - fine-tuning: fc first, then layer4 is unfrozen as well (src/train.py decides when).
-  conv1, bn1, layer1, layer2 and layer3 always stay frozen.
+  conv1, bn1, layer1, layer2 and layer3 stay frozen.
+- fine-tuning with layer3 + layer4 (src/train.py --resnet-ft-layers layer3_layer4): fc first,
+  then layer3 and layer4 are unfrozen; conv1, bn1, layer1 and layer2 stay frozen.
 
 Frozen parts are kept in eval mode, also when model.train() is called, so the
 running statistics of their BatchNorm layers stay the pretrained ImageNet values.
@@ -18,6 +20,8 @@ NUM_CLASSES = 8
 PRETRAINED_WEIGHTS = "IMAGENET1K_V1"
 # top-level parts of torchvision's ResNet18, in forward order (fc is the head)
 BACKBONE_PARTS = ("conv1", "bn1", "relu", "maxpool", "layer1", "layer2", "layer3", "layer4")
+# residual stages that fine-tuning may unfreeze
+UNFREEZABLE_LAYERS = ("layer1", "layer2", "layer3", "layer4")
 
 
 def set_trainable(module, trainable):
@@ -63,9 +67,19 @@ def freeze_backbone(model):
     set_trainable(model.net.fc, True)
 
 
+def unfreeze_layers(model, names):
+    """Fine-tuning: the named residual stages become trainable too (all other parts keep their state)."""
+    names = tuple(names)
+    unknown = [name for name in names if name not in UNFREEZABLE_LAYERS]
+    if not names or unknown:
+        raise ValueError(f"layers to unfreeze must be a non-empty subset of {UNFREEZABLE_LAYERS}, got {names}")
+    for name in names:
+        set_trainable(getattr(model.net, name), True)
+
+
 def unfreeze_layer4(model):
     """Fine-tuning: layer4 becomes trainable too (conv1, bn1, layer1-3 stay frozen)."""
-    set_trainable(model.net.layer4, True)
+    unfreeze_layers(model, ("layer4",))
 
 
 def trainable_parts(model):
