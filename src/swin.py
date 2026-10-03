@@ -7,9 +7,14 @@ torchvision's SwinTransformer runs features -> norm -> permute -> avgpool -> fla
 net.features has 8 parts: features[0] = patch embedding, features[1, 3, 5, 7] = the four stages
 (2, 2, 6, 2 Swin blocks), features[2, 4, 6] = the patch-merging layers in between; net.norm = LayerNorm(768).
 
-Only feature extraction is supported: net.features and net.norm are frozen, only net.head is trained.
-The frozen parts are kept in eval mode, also when model.train() is called, so the stochastic depth of
-the Swin blocks is off (Swin uses LayerNorm, not BatchNorm; the rule is the same as in src/convnext.py).
+Two modes (src/train.py decides when to unfreeze):
+- feature extraction: net.features and net.norm are frozen, only net.head is trained.
+- fine-tuning: net.head first, then features[6:8] (UNFREEZE_STAGES: the last patch-merging layer and the
+  last stage) and net.norm as well; features[0:6] always stay frozen.
+
+Frozen parts are kept in eval mode, also when model.train() is called, so the stochastic depth of the
+frozen Swin blocks is off (Swin uses LayerNorm, not BatchNorm; the rule is the same as in src/convnext.py).
+Unfrozen parts follow model.train() / model.eval().
 
 This model is not used by src/predict.py; the final model of the project stays ResNet18.
 """
@@ -20,6 +25,7 @@ from torchvision import models
 NUM_CLASSES = 8
 PRETRAINED_WEIGHTS = "IMAGENET1K_V1"
 FEATURE_DIM = 768   # output size of the last Swin-Tiny stage (input size of the head)
+UNFREEZE_STAGES = (6, 7)   # fine-tuning: the last patch-merging layer and the last stage of net.features
 
 
 def set_trainable(module, trainable):
@@ -70,8 +76,20 @@ def freeze_backbone(model):
     set_trainable(model.net.head, True)
 
 
+def top_stage_parameters(model):
+    """Parameters of features[6:8] and norm, the parts that fine-tuning unfreezes (for the optimizer)."""
+    return [p for i in UNFREEZE_STAGES for p in model.net.features[i].parameters()] + list(model.net.norm.parameters())
+
+
+def unfreeze_top_stages(model):
+    """Fine-tuning: features[6:8] and norm become trainable too (features[0:6] stay frozen)."""
+    for i in UNFREEZE_STAGES:
+        set_trainable(model.net.features[i], True)
+    set_trainable(model.net.norm, True)
+
+
 def trainable_parts(model):
-    """Names of the parts that are trained, e.g. ["head"]."""
+    """Names of the parts that are trained, e.g. ["head"] or ["features.6", "features.7", "norm", "head"]."""
     parts = [f"features.{i}" for i, stage in enumerate(model.net.features) if is_trainable(stage)]
     parts += ["norm"] if is_trainable(model.net.norm) else []
     return parts + (["head"] if is_trainable(model.net.head) else [])

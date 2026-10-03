@@ -11,6 +11,7 @@ Run from the repository root:
     python -m src.train --run-name convnext_t_fe_none --model convnext_tiny
     python -m src.train --run-name convnext_t_ft_none --model convnext_tiny --convnext-mode fine_tuning
     python -m src.train --run-name swin_t_fe_none --model swin_tiny
+    python -m src.train --run-name swin_t_ft_none --model swin_tiny --swin-mode fine_tuning
 
 Only the "train" and "val" rows of data/split_manifest.csv are used.
 The test set is not read anywhere in this file.
@@ -173,12 +174,16 @@ CONVNEXT_TOP_LR = 1e-4             # pretrained features[6:8] in fine-tuning, 10
 CONVNEXT_TOP_GROUP = "features.6-7"
 CONVNEXT_RUN_PREFIX = "convnext_t_"
 
-# Swin-Tiny: separate comparison experiment (src/swin.py), feature extraction only (no fine-tuning mode).
+# Swin-Tiny: separate comparison experiment (src/swin.py).
 # Same 224x224 input, ImageNet normalization and train transforms as ResNet18 / EfficientNet-B0 /
-# ConvNeXt-Tiny (the project transform, not the preset of Swin_T_Weights). One optimizer group: the head.
-# Run names must start with SWIN_RUN_PREFIX; existing runs are never overwritten.
-SWIN_MODE = "feature_extraction"
+# ConvNeXt-Tiny (the project transform, not the preset of Swin_T_Weights), and the same learning rates and
+# warm-up as their fine-tuning. Feature extraction: one optimizer group (the head); fine-tuning: the head
+# and the top group (features[6:8] + norm). Run names must start with SWIN_RUN_PREFIX; existing runs are
+# never overwritten.
+SWIN_MODES = ("feature_extraction", "fine_tuning")
 SWIN_HEAD_LR = LEARNING_RATE   # new 8-class head (Linear(768, 8)), 1e-3
+SWIN_TOP_LR = 1e-4             # pretrained features[6:8] + norm in fine-tuning, 10x smaller (same as RESNET_LAYER4_LR)
+SWIN_TOP_GROUP = "features.6-7+norm"
 SWIN_RUN_PREFIX = "swin_t_"
 
 DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -345,16 +350,24 @@ def resnet_checkpoint_metadata(model, resnet_mode, resnet_ft_layers, group_lrs):
     }
 
 
-def swin_param_groups(model):
-    """Optimizer groups for --model swin_tiny: exactly one group, the head. Returns (param_groups, {group name: lr})."""
+def swin_param_groups(model, swin_mode="feature_extraction"):
+    """Optimizer groups for --model swin_tiny: the head; in fine-tuning also the top group (features[6:8] + norm).
+
+    The top group is in the optimizer from the start; its parameters have no gradient (frozen) until the
+    warm-up ends, so the optimizer skips them. Returns (param_groups, {group name: lr}).
+    """
     group_lrs = {"head": SWIN_HEAD_LR}
     param_groups = [{"params": list(model.net.head.parameters()), "lr": SWIN_HEAD_LR}]
+    if swin_mode == "fine_tuning":
+        group_lrs[SWIN_TOP_GROUP] = SWIN_TOP_LR
+        param_groups.append({"params": swin.top_stage_parameters(model), "lr": SWIN_TOP_LR})
     return param_groups, group_lrs
 
 
-def swin_checkpoint_metadata(model, group_lrs, augmentation):
+def swin_checkpoint_metadata(model, group_lrs, augmentation, swin_mode="feature_extraction"):
     """Swin-Tiny-specific checkpoint keys (plain Python values only)."""
     trainable, frozen = swin.count_params(model)
+    fine_tuning = swin_mode == "fine_tuning"
     return {
         "architecture": "Swin-Tiny",
         "image_size": RESNET_IMAGE_SIZE,
@@ -364,9 +377,9 @@ def swin_checkpoint_metadata(model, group_lrs, augmentation):
         "dropout": None,   # not used: the new head has no dropout
         "pooling": None,   # not used: Swin-Tiny has its own pooling
         "pretrained_weights": swin.PRETRAINED_WEIGHTS,
-        "swin_mode": SWIN_MODE,
-        "warmup_epochs": None,
-        "unfrozen_stages": None,
+        "swin_mode": swin_mode,
+        "warmup_epochs": FT_WARMUP_EPOCHS if fine_tuning else None,
+        "unfrozen_stages": list(swin.UNFREEZE_STAGES) if fine_tuning else None,   # norm is unfrozen with them
         "trainable_parts": swin.trainable_parts(model),
         "trainable_params": trainable,
         "frozen_params": frozen,
@@ -385,7 +398,8 @@ def train(run_name, manifest_path, config_path, epochs=EPOCHS, augmentation="non
           pooling="max", optimizer_name="adam", weight_decay=WEIGHT_DECAY, scheduler_name="none",
           train_subset=None, batch_mode="standard", loss_name="ce", model_name="baseline",
           resnet_mode=None, effnet_mode="feature_extraction", effnet_top_lr=EFFNET_TOP_LR,
-          convnext_mode="feature_extraction", resnet_ft_layers=RESNET_DEFAULT_FT_LAYERS):
+          convnext_mode="feature_extraction", resnet_ft_layers=RESNET_DEFAULT_FT_LAYERS,
+          swin_mode="feature_extraction"):
     is_resnet = model_name == "resnet18"
     if is_resnet:
         check_resnet_ft_layers(resnet_mode, resnet_ft_layers)
@@ -410,6 +424,8 @@ def train(run_name, manifest_path, config_path, epochs=EPOCHS, augmentation="non
         refuse_existing_run(run_name)
     is_swin = model_name == "swin_tiny"
     if is_swin:
+        if swin_mode not in SWIN_MODES:
+            raise ValueError(f"swin_mode must be one of {SWIN_MODES}, got '{swin_mode}'")
         if not run_name.startswith(SWIN_RUN_PREFIX):
             raise ValueError(f"Swin-Tiny run names must start with '{SWIN_RUN_PREFIX}', got '{run_name}'")
         refuse_existing_run(run_name)
@@ -475,11 +491,14 @@ def train(run_name, manifest_path, config_path, epochs=EPOCHS, augmentation="non
               + (f" | features[6:8] unfrozen from epoch {FT_WARMUP_EPOCHS + 1}" if convnext_mode == "fine_tuning" else ""))
     elif is_swin:
         model = swin.build_swin_tiny(num_classes=len(CLASSES)).to(DEVICE)   # features and norm frozen
-        param_groups, group_lrs = swin_param_groups(model)   # head only, the whole run
+        # head from epoch 1; in fine-tuning the features[6:8] + norm group is in the optimizer from the start,
+        # but its parameters have no gradient (frozen) until epoch 6, so the optimizer skips them
+        param_groups, group_lrs = swin_param_groups(model, swin_mode)
         optimizer = OPTIMIZERS[optimizer_name](param_groups, weight_decay=weight_decay)
         trainable, frozen = swin.count_params(model)
-        print(f"model swin_tiny ({swin.PRETRAINED_WEIGHTS}) | mode {SWIN_MODE} | head {model.net.head} "
-              f"| trainable {trainable:,} | frozen {frozen:,} | lr per group {group_lrs}")
+        print(f"model swin_tiny ({swin.PRETRAINED_WEIGHTS}) | mode {swin_mode} | head {model.net.head} "
+              f"| trainable {trainable:,} | frozen {frozen:,} | lr per group {group_lrs}"
+              + (f" | features[6:8] + norm unfrozen from epoch {FT_WARMUP_EPOCHS + 1}" if swin_mode == "fine_tuning" else ""))
     else:
         model = BaselineCNN(num_classes=len(CLASSES), image_size=IMAGE_SIZE, dropout=dropout,
                             pooling=pooling).to(DEVICE)
@@ -509,6 +528,10 @@ def train(run_name, manifest_path, config_path, epochs=EPOCHS, augmentation="non
             convnext.unfreeze_top_stages(model)
             trainable, frozen = convnext.count_params(model)
             print(f"epoch {epoch}: features[6:8] unfrozen | trainable {trainable:,} | frozen {frozen:,}")
+        if is_swin and swin_mode == "fine_tuning" and epoch == FT_WARMUP_EPOCHS + 1:
+            swin.unfreeze_top_stages(model)
+            trainable, frozen = swin.count_params(model)
+            print(f"epoch {epoch}: features[6:8] + norm unfrozen | trainable {trainable:,} | frozen {frozen:,}")
         train_m = run_epoch(model, train_loader, criterion, optimizer, loss_name=loss_name)
         val_m = run_epoch(model, val_loader, criterion, loss_name=loss_name)
 
@@ -528,6 +551,8 @@ def train(run_name, manifest_path, config_path, epochs=EPOCHS, augmentation="non
                 row["lr_top"] = optimizer.param_groups[1]["lr"]   # features[6:8] group
         elif is_swin:
             row["trainable_params"] = swin.count_params(model)[0]
+            if swin_mode == "fine_tuning":
+                row["lr_top"] = optimizer.param_groups[1]["lr"]   # features[6:8] + norm group
         history.append(row)
         print(f"epoch {epoch:2d} | train_loss {train_m['loss']:.4f} | val_loss {val_m['loss']:.4f} "
               f"| val_acc {val_m['accuracy']:.4f} | val_f1 {val_m['f1']:.4f}")
@@ -609,7 +634,7 @@ def train(run_name, manifest_path, config_path, epochs=EPOCHS, augmentation="non
                     "param_group_lrs": group_lrs,
                 })
             elif is_swin:
-                checkpoint.update(swin_checkpoint_metadata(model, group_lrs, augmentation))
+                checkpoint.update(swin_checkpoint_metadata(model, group_lrs, augmentation, swin_mode))
             torch.save(checkpoint, checkpoint_path)
             print(f"  -> saved {checkpoint_path.name} (val_f1 {best_f1:.4f})")
 
@@ -654,7 +679,7 @@ def main():
                         help="baseline = BaselineCNN (default), resnet18 = pretrained ResNet18 (needs --resnet-mode), "
                              f"efficientnet_b0 = pretrained EfficientNet-B0, classifier only (run name '{EFFNET_RUN_PREFIX}...'), "
                              f"convnext_tiny = pretrained ConvNeXt-Tiny (run name '{CONVNEXT_RUN_PREFIX}...', see --convnext-mode), "
-                             f"swin_tiny = pretrained Swin-Tiny, head only (run name '{SWIN_RUN_PREFIX}...')")
+                             f"swin_tiny = pretrained Swin-Tiny (run name '{SWIN_RUN_PREFIX}...', see --swin-mode)")
     parser.add_argument("--resnet-mode", choices=list(RESNET_MODES), default=None,
                         help="feature_extraction = only fc trained; fine_tuning = fc, then layer4 (or the layers of "
                              f"--resnet-ft-layers) from epoch {FT_WARMUP_EPOCHS + 1}")
@@ -671,7 +696,13 @@ def main():
     parser.add_argument("--convnext-mode", choices=list(CONVNEXT_MODES), default=None,
                         help="convnext_tiny only: feature_extraction (default) = only the classifier trained; "
                              f"fine_tuning = classifier, then features[6:8] from epoch {FT_WARMUP_EPOCHS + 1}")
+    parser.add_argument("--swin-mode", choices=list(SWIN_MODES), default=None,
+                        help="swin_tiny only: feature_extraction (default) = only the head trained; "
+                             f"fine_tuning = head, then features[6:8] and norm from epoch {FT_WARMUP_EPOCHS + 1}")
     args = parser.parse_args()
+    if args.model != "swin_tiny" and args.swin_mode is not None:
+        parser.error("--swin-mode is only used with --model swin_tiny")
+    swin_mode = args.swin_mode or "feature_extraction"
     if args.model != "convnext_tiny" and args.convnext_mode is not None:
         parser.error("--convnext-mode is only used with --model convnext_tiny")
     convnext_mode = args.convnext_mode or "feature_extraction"
@@ -715,7 +746,7 @@ def main():
     train(args.run_name, args.manifest, args.config, args.epochs, args.augmentation, args.dropout,
           args.pooling, args.optimizer, args.weight_decay, args.scheduler,
           args.train_subset, args.batch_mode, args.loss, args.model, args.resnet_mode, effnet_mode, effnet_top_lr,
-          convnext_mode, resnet_ft_layers)
+          convnext_mode, resnet_ft_layers, swin_mode)
 
 
 if __name__ == "__main__":
