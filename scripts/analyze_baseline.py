@@ -105,6 +105,7 @@ def history_observations(history, best):
     last = history[-1]
     min_val = min(history, key=lambda r: r["val_loss"])
     first_perfect = next((r["epoch"] for r in history if r["train_accuracy"] == 1.0), None)
+    val_f1_after_min = [r["val_f1"] for r in history if r["epoch"] > min_val["epoch"]]
     lines = [
         f"- lowest validation loss: {min_val['val_loss']:.4f} at epoch {min_val['epoch']}",
         f"- validation loss at best-F1 epoch {best['epoch']}: {best['val_loss']:.4f}; "
@@ -117,9 +118,10 @@ def history_observations(history, best):
         f"val loss / train loss gap {last['val_loss'] - last['train_loss']:.4f}",
         f"- after epoch {min_val['epoch']} validation loss does not return to its minimum while train "
         f"loss keeps falling; validation macro F1 stays between "
-        f"{min(r['val_f1'] for r in history if r['epoch'] > min_val['epoch']):.4f} and "
-        f"{max(r['val_f1'] for r in history if r['epoch'] > min_val['epoch']):.4f}. "
-        f"This train/validation divergence is a typical sign of overfitting.",
+        f"{min(val_f1_after_min):.4f} and {max(val_f1_after_min):.4f}. "
+        f"This train/validation divergence is a typical sign of overfitting." if val_f1_after_min
+        else f"- validation loss is lowest at the last epoch ({min_val['epoch']}): there are no later epochs, "
+             f"so no train/validation divergence after the minimum can be observed in this run.",
     ]
     return lines
 
