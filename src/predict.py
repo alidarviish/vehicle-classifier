@@ -6,7 +6,7 @@ Usage (from the repository root):
 Prints JSON, one object per image:
     {"path": ..., "predicted_class": ..., "confidence": ..., "probabilities": {...}, "needs_review": ...}
 
-- Model: the checkpoint selected on validation (reports/experiments/10_final_model_selection.md).
+- Model: the checkpoint selected on validation (decisions/REOPEN_FINAL_MODEL_SELECTION.md).
 - Preprocessing: the transform recorded in the checkpoint, i.e. RESNET_TRANSFORM:
   Resize((224, 224)) -> ToTensor -> ImageNet normalization. No training augmentation.
 - needs_review: True when the confidence (highest softmax probability) is below
@@ -25,15 +25,15 @@ import torch
 from PIL import Image
 
 from src.dataset import CLASS_TO_IDX, CLASSES
-from src.resnet import build_resnet18
+from src.swin import build_swin_tiny
 from src.train import resnet_transform
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
-FINAL_CHECKPOINT = REPO_ROOT / "checkpoints" / "resnet224_ft_aug_best.pt"
+FINAL_CHECKPOINT = REPO_ROOT / "checkpoints" / "swin_t_ft_aug_best.pt"
 
-# Chosen on validation only, see reports/experiments/11_needs_review_threshold.md.
+# Chosen on validation only, see reports/experiments/23_swin_needs_review_threshold.md.
 # This is the single place where the threshold is defined.
-NEEDS_REVIEW_THRESHOLD = 0.90
+NEEDS_REVIEW_THRESHOLD = 0.95
 
 
 def needs_review(confidence, threshold=NEEDS_REVIEW_THRESHOLD):
@@ -42,13 +42,13 @@ def needs_review(confidence, threshold=NEEDS_REVIEW_THRESHOLD):
 
 
 def load_model(checkpoint_path=FINAL_CHECKPOINT):
-    """Load the ResNet18 checkpoint for inference. Returns (model, eval_transform, checkpoint)."""
+    """Load the Swin-Tiny checkpoint for inference. Returns (model, eval_transform, checkpoint)."""
     checkpoint = torch.load(checkpoint_path, map_location="cpu", weights_only=True)
-    if checkpoint["architecture"] != "ResNet18":
-        raise ValueError(f"expected a ResNet18 checkpoint, got {checkpoint['architecture']}")
+    if checkpoint["architecture"] != "Swin-Tiny":
+        raise ValueError(f"expected a Swin-Tiny checkpoint, got {checkpoint['architecture']}")
     if checkpoint["class_to_idx"] != CLASS_TO_IDX:
         raise ValueError(f"class mapping in checkpoint differs: {checkpoint['class_to_idx']}")
-    model = build_resnet18(num_classes=len(CLASSES), pretrained=False)   # weights come from the checkpoint
+    model = build_swin_tiny(num_classes=len(CLASSES), pretrained=False)   # weights come from the checkpoint
     model.load_state_dict(checkpoint["model_state"])
     model.eval()
     # evaluation transform only (resize + normalization); the training augmentation is never used here
