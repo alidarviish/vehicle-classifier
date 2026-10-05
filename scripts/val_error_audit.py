@@ -59,6 +59,7 @@ ARCHITECTURES = {                                  # checkpoint "architecture" -
     "ResNet18": ("src.resnet", "build_resnet18"),
     "EfficientNet-B0": ("src.efficientnet", "build_efficientnet_b0"),
     "ConvNeXt-Tiny": ("src.convnext", "build_convnext_tiny"),
+    "Swin-Tiny": ("src.swin", "build_swin_tiny"),
 }
 
 OUTPUT_FILES = ("val_predictions.csv", "per_class_audit.csv", "confusion_pairs.csv", "confidence_bins.csv",
