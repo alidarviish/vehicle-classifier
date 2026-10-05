@@ -2,7 +2,7 @@
 
 Status: Adopted
 Decision date: 2026-10-04
-Decision commit: <commit after adoption>
+Decision commit: 76669f4
 
 ## Context
 
@@ -123,7 +123,7 @@ The selection uses validation metrics only.
 | 2026-10-03 09:42 | `8b034a3` | Swin-Tiny partial fine-tuning infrastructure |
 | 2026-10-03 13:10 | `5ae57b6` | `swin_t_ft_none` result (report 21) |
 | 2026-10-03 17:36 | `9072ce6` | `swin_t_ft_aug` result (report 22) |
-| 2026-10-04 | <commit after adoption> | This reopening decision |
+| 2026-10-04 | 76669f4 | This reopening decision |
 
 ## Scope
 

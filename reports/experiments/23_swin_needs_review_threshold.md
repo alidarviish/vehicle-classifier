@@ -5,6 +5,10 @@ Status: threshold decided on validation (0.95) for the new final model `swin_t_f
 Test and Neysan were not used. The ResNet threshold (0.90, `11_needs_review_threshold.md`)
 is unchanged as the historical decision for `resnet224_ft_aug`.
 
+Current status: the threshold is now applied in `src/predict.py` as `NEEDS_REVIEW_THRESHOLD = 0.95`
+(commit `a81184a`). The statements in this report that it is "not yet applied" or "will be defined" describe the
+state when this report was written; the current code differs.
+
 ## Purpose
 
 `needs_review` is a human-review flag only. A prediction whose top softmax probability

@@ -63,6 +63,7 @@ The data scripts only read the raw images.
 | Validation analysis of a run | `python scripts/analyze_baseline.py --run-name <run_name>` |
 | ResNet setup checks (no data) | `python scripts/verify_resnet.py` |
 | Test evaluation (done once, historical `resnet224_ft_aug`) | `python scripts/evaluate_test.py` |
+| Test evaluation (done once, final model `swin_t_ft_aug`; second use of the frozen Test set) | `python scripts/evaluate_test_swin.py` |
 | Neysan evaluation (done once, historical `resnet224_ft_aug`) | `python scripts/evaluate_neysan.py` |
 | Neysan evaluation (done once, final model `swin_t_ft_aug`) | `python scripts/evaluate_neysan_swin.py --visibility-tags <tags.csv> --val-baseline <val_predictions.csv>` |
 | Prediction (JSON) | `python -m src.predict path/to/image.jpg [more images]` |
@@ -79,8 +80,9 @@ Notes on the commands:
 - **One-time scripts.** `evaluate_test.py` and `evaluate_neysan.py` refuse to run again once their
   outputs exist. Both are fixed to the previous final model `resnet224_ft_aug` (checkpoint SHA256
   and threshold 0.90) and are kept unchanged as historical scripts; they do not evaluate
-  `swin_t_ft_aug`. `evaluate_neysan_swin.py` evaluates `swin_t_ft_aug` on the same Neysan set, writes
-  only the `25_*` outputs and also refuses to run again.
+  `swin_t_ft_aug`. `evaluate_test_swin.py` evaluates `swin_t_ft_aug` on the frozen Test set, writes only
+  the `24_*` outputs and also refuses to run again. `evaluate_neysan_swin.py` evaluates `swin_t_ft_aug` on
+  the same Neysan set, writes only the `25_*` outputs and also refuses to run again.
 
 ## Final model
 
@@ -209,6 +211,7 @@ Run after the original final model was fixed. The EfficientNet-B0 comparison did
 - [CE vs BCE](reports/experiments/07_ce_vs_bce.md)
 - [ResNet18 experiments](reports/experiments/08_resnet.md)
 - [Final Test evaluation (ResNet, historical)](reports/experiments/12_final_test_evaluation.md)
+- [Final Test evaluation (Swin-Tiny, final model; second use of the frozen Test set)](reports/experiments/24_swin_final_test_evaluation.md)
 - [Neysan / unclean analysis (ResNet, historical)](reports/experiments/13_neysan_unclean_analysis.md)
 - [Neysan evaluation (Swin-Tiny, final model)](reports/experiments/25_swin_neysan_evaluation.md)
 - [Dataset decisions](docs/DATA_DECISIONS.md)
