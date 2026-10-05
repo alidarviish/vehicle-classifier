@@ -31,9 +31,9 @@ order (`scripts/build_statuses.py`):
 
 ## Old label_overrides policy
 
-The previous project kept a list of 112 decisions (48 `drop`, 64 `relabel`) in its file
-`CSV/label_overrides.csv` (columns `path, action, new_label, reason`; paths without the
-source prefix, each matching exactly one manifest image).
+An earlier dataset review recorded a list of 112 decisions (48 `drop`, 64 `relabel`), kept in
+this repository as `decisions/old_label_overrides.csv` (columns `path, action, new_label, reason`;
+paths without the source prefix, each matching exactly one manifest image).
 
 - Drops are kept: 47 of the 48 dropped images are `excluded`:
   38 exact or near-duplicates of a v1/test image (Test leakage) and 9 quality / wrong-class images.
@@ -42,9 +42,9 @@ source prefix, each matching exactly one manifest image).
 - The 64 old relabels are NOT applied; pool images keep their `folder_label`
   (59 kamyun -> kamyunet, 2 savari -> taxi, 1 taxi -> savari, 1 vanet -> savari, 1 ambulance -> vanet).
 
-Source: the list comes from the previous project. A byte-for-byte copy (SHA256 verified against
-the original) is now in this repository as `decisions/old_label_overrides.csv`, and
-`scripts/build_statuses.py` reads it from there; the previous project is no longer needed.
+Source: the list comes from an earlier dataset review. `decisions/old_label_overrides.csv` is a
+byte-for-byte copy of it (SHA256 verified against the original), and `scripts/build_statuses.py`
+reads it from there; no other copy is needed.
 
 ## Human label corrections
 
@@ -151,6 +151,6 @@ The inputs and lists that were missing are now in the repository:
 `decisions/old_label_overrides.csv`, `decisions/test_frozen.csv` (400 images) and
 `decisions/neysan_eval.csv` (621 images). The one remaining gap is outside the repository:
 
-- The local snapshot outside the repository (`vehicle-classifier-dataset/` and its zip) no longer
-  contains `snapshot_manifest.csv`, so its files are only traceable through their names
+- The local snapshot outside the repository (folder and zip) no longer contains `snapshot_manifest.csv`,
+  so its files are only traceable through their names
   (`<source>_<origin_split>_<file>`).

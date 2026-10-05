@@ -13,7 +13,7 @@ How the 34 were chosen (recorded for audit; the list below is what counts):
     picks      = 9, 9, 8, 8
     index j    = (2*j*(N-1) + (k-1)) // (2*(k-1)),  j = 0..k-1  (evenly spaced, first and last included)
 At that time the candidate filter used the old relabels (v2/unclean/vanet/209939482.jpg was relabelled
-vanet -> savari and therefore not a candidate), and the old near-duplicate list of the previous project.
+vanet -> savari and therefore not a candidate), and the old near-duplicate list of an earlier dataset review.
 Recomputing the formula today without those inputs can give a different list; do not.
 
 Only reads files. Writes a CSV only when --out is given.

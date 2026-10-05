@@ -5,7 +5,7 @@ No training, and the test set and Neysan images are never loaded.
 Raw images are only read; the sheets are written OUTSIDE the repository.
 
 Run from the repository root:
-    python -m scripts.review_baseline_errors --out "../review_package/baseline_errors"
+    python -m scripts.review_baseline_errors --out "PATH_TO_REVIEW_OUTPUT/baseline_errors"
 """
 
 import argparse

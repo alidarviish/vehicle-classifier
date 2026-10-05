@@ -10,7 +10,7 @@ never copied, moved or changed; only class labels are drawn, no file paths.
 The figure is written outside the repository, to the path given with --out.
 
 Usage (from the repository root):
-    python scripts/make_labelled_sample_figure.py --out ../review_package/labelled_samples.png
+    python scripts/make_labelled_sample_figure.py --out PATH_TO_REVIEW_OUTPUT/labelled_samples.png
 """
 
 import argparse
@@ -85,7 +85,7 @@ def main():
     parser = argparse.ArgumentParser(description="Labelled sample figure for the data audit "
                                                  "(written outside the repository).")
     parser.add_argument("--out", required=True, help="output image file outside the repository, "
-                                                     "e.g. ../review_package/labelled_samples.png")
+                                                     "e.g. PATH_TO_REVIEW_OUTPUT/labelled_samples.png")
     parser.add_argument("--manifest", default=str(MANIFEST))
     parser.add_argument("--config", default=str(CONFIG), help="local raw-data paths (JSON)")
     args = parser.parse_args()

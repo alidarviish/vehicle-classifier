@@ -74,8 +74,8 @@ NOT RECOVERED**. This record does not define either class.
 
 ## Sources
 
-The audit outputs (candidate list, review sheets, decisions, isolation audit) are kept in a private
-folder outside the repository and are not tracked. Repository inputs: `data/split_manifest.csv`
+The audit outputs (candidate list, review sheets, decisions, isolation audit) are retained outside
+the repository and are not part of the repository. Repository inputs: `data/split_manifest.csv`
 (not tracked), `decisions/old_label_overrides.csv`, `decisions/kamyun_kamyunet_review.csv`,
 `decisions/kamyunet_kamyun_review.csv`, `reports/analysis/resnet224_ft_aug/val_audit/val_predictions.csv`
 (not tracked). No training or inference was run; Test and Neysan were not read.

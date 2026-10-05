@@ -5,10 +5,10 @@ so no image ever ends up in Git. Nothing is drawn on the images themselves;
 only the review_id and image_path are written under each thumbnail.
 
 Usage:
-    python scripts/make_contact_sheets.py --out ../review_package/neysan_review
+    python scripts/make_contact_sheets.py --out PATH_TO_REVIEW_OUTPUT/neysan_review
     python scripts/make_contact_sheets.py --queue decisions/neysan_review_queue.csv \
         --decisions decisions/neysan_review.csv --config configs/local_paths.json \
-        --out ../review_package/neysan_review
+        --out PATH_TO_REVIEW_OUTPUT/neysan_review
 """
 
 import argparse

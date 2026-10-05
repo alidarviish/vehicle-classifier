@@ -15,8 +15,8 @@ the model, the threshold or the final Test result.
 - Inference transform: Resize(size=(224, 224), interpolation=bilinear, max_size=None, antialias=True) -> ToTensor() -> Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]) (no training augmentation)
 - `needs_review` threshold: 0.95 (confidence < threshold; flag only, nothing rejected)
 - Neysan manifest: `decisions/neysan_eval.csv`, SHA256 `1e8cad9bbca206740f78dda72da6318c8851d6f56ec17281317048308576086a`
-- Visibility tags (private, Gate 1): `eligibility_unblinded.csv`, SHA256 `7f5b5fc2eabb7dcd31b1b0a9d1a06840f33a65f8fee3b5ae580f33c9e1526022`
-- Validation baseline (private): `swin_t_ft_aug_val_predictions.csv`, SHA256 `87cf759b1d27770c876fb3748599551d32a789dd953ee8c774333253c18e956f`
+- Visibility tags (Gate-1 visibility / lighting annotation, not part of the repository): SHA256 `7f5b5fc2eabb7dcd31b1b0a9d1a06840f33a65f8fee3b5ae580f33c9e1526022`
+- Validation baseline (existing per-image `swin_t_ft_aug` validation predictions, not part of the repository): SHA256 `87cf759b1d27770c876fb3748599551d32a789dd953ee8c774333253c18e956f`
 
 ## A. Subgroups
 

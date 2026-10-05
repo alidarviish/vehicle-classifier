@@ -11,7 +11,8 @@ below are the existing ones of the final model `resnet224_ft_aug`
 **PARTIAL DISTINCTION ONLY.**
 
 - This is not a working definition of the two classes.
-- No explicit, recoverable definition of the boundary was found in the earlier project records
+- No explicit, recoverable definition of the boundary was found in the project records or in the
+  records of the earlier dataset review
   (`docs/DATA_DECISIONS.md`, `decisions/`, the review files, the old relabel list and its history).
 - The earlier reviews record decisions per image ("manual visual review") without the criterion used.
 
@@ -33,7 +34,7 @@ A deterministic sample of 60 images per class (seed 42) was coded from contact s
 - Crop size differs between the classes on average, but it depends on camera distance and cropping.
   It was not accepted as a criterion, and no size threshold was derived.
 - Exact duplicates: 4 groups, all within `kamyunet`; none with different labels.
-- Near duplicates (pHash distance ≤ 5, the previous project's rule): one cross-label pair, two
+- Near duplicates (pHash distance ≤ 5, the rule of the earlier dataset review): one cross-label pair, two
   different JAC cab-over trucks of the same visible type: `v1/train/kamyun/216040476.jpg` (kamyun)
   and `v2/unclean/kamyunet/214105935.jpg` (kamyunet).
 
@@ -83,7 +84,7 @@ label with the same appearance were searched in the audit sample and the recorde
 
 ## 6. Provenance and label consistency (facts only)
 
-The old relabel list (`decisions/old_label_overrides.csv`, from the previous project, not applied)
+The old relabel list (`decisions/old_label_overrides.csv`, from an earlier dataset review, not applied)
 and the current labels are recorded separately; the old recommendation is not the current ground
 truth.
 
@@ -126,14 +127,8 @@ These audits have **not** shown that:
 
 ## 9. Sources
 
-The audits were run on the private dataset; their outputs (including contact sheets) are kept in a
-private folder outside the repository and are not tracked. File names, relative to that folder:
-
-- `kk_evidence_audit/kk_evidence_report.md`, `kk_evidence_audit/visual_observations.csv`
-- `kk_narrow_cab_review/review_report.md`, `kk_narrow_cab_review/narrow_cab_review.csv`
-- `kk_overlap_error_join/join_report.md`, `kk_overlap_error_join/overlap_error_join.csv`
-- `kk_conflicting_neighbors/conflict_audit.md`, `kk_conflicting_neighbors/conflict_audit.csv`,
-  `kk_conflicting_neighbors/neighbors.csv`
+The audits were run on the private dataset; their outputs (including contact sheets) are retained
+outside the repository and are not part of the repository.
 
 Repository inputs: `data/split_manifest.csv` (not tracked),
 `reports/analysis/resnet224_ft_aug/val_audit/val_predictions.csv` (not tracked),

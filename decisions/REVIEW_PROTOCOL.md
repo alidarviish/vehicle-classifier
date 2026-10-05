@@ -41,7 +41,7 @@ Not sufficient evidence on its own:
 
 - blue colour (the colour screen only sorted the queue),
 - the Nissan badge (modern Nissan pickups have it too),
-- the folder name, old project decisions, or model predictions,
+- the folder name, earlier dataset decisions, or model predictions,
 - "looks like the others on the sheet".
 
 ## Decisions

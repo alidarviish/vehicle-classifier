@@ -28,7 +28,7 @@ if str(REPO_ROOT) not in sys.path:
 
 DEFAULT_MANIFEST = REPO_ROOT / "data" / "manifest.csv"
 DECISIONS_DIR = REPO_ROOT / "decisions"
-# In-repo copy of the old project's drop/relabel list (byte-identical, see docs/DATA_DECISIONS.md).
+# In-repo copy of the drop/relabel list of an earlier dataset review (byte-identical, see docs/DATA_DECISIONS.md).
 DEFAULT_OVERRIDES = DECISIONS_DIR / "old_label_overrides.csv"
 NEYSAN_REVIEWS = ["neysan_review.csv", "neysan_test_review.csv"]
 
