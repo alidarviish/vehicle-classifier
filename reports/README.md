@@ -3,10 +3,14 @@
 Validation results of every experiment run so far (split `data/split_manifest.csv`,
 train / validation = 2633 / 659 unless noted, seed 42; each run was trained once). Metrics are for
 the checkpoint with the highest validation macro F1. All metrics in this index are validation
-results. The test set was evaluated once, only after the final model, the `needs_review` threshold
-and the inference protocol were fixed (see [Final Test evaluation](#final-test-evaluation)). The
-Neysan evaluation set was analysed separately, inference only, after the Test evaluation (see
-[Neysan evaluation](#neysan-evaluation)); it was not used for any decision.
+results. The frozen test set was first evaluated once for the original final model
+`resnet224_ft_aug`, after its model, `needs_review` threshold and inference protocol were fixed. The
+final model selection was later reopened on validation evidence only, and `swin_t_ft_aug` was
+selected; the frozen test set was then used a second time for it. This second use is a documented
+protocol deviation, so that result is not a pristine held-out estimate (see
+[Final Test evaluation](#final-test-evaluation)). The Neysan evaluation set was analysed separately,
+inference only, for each final model (see [Neysan evaluation](#neysan-evaluation)); it was not used
+for any decision.
 
 | Experiment | Run | Best epoch | Val accuracy | Macro precision | Macro recall | Macro F1 | Note |
 |---|---|---|---|---|---|---|---|
@@ -114,10 +118,31 @@ single run with seed 42 and is not general evidence about the effect of this com
 
 ## Final model selection
 
+### Current final model: `swin_t_ft_aug` (reopened selection)
+
+The final model selection was reopened after the original project was closed
+([decisions/REOPEN_FINAL_MODEL_SELECTION.md](../decisions/REOPEN_FINAL_MODEL_SELECTION.md)).
+**`swin_t_ft_aug`** was adopted as the current final model on validation evidence only, checkpoint
+`checkpoints/swin_t_ft_aug_best.pt` (epoch 17). Its validation results are accuracy 0.9712, macro
+precision 0.9626, macro recall 0.9698 and macro F1 0.9658. No Test result was used for this selection.
+
+Chosen `needs_review` threshold (validation only): **0.95**, the lowest examined threshold that flags at
+least 50% of the validation errors (11 of 19); it flags 48 of 659 validation images. The test set and
+the Neysan images were not used to choose it.
+
+Reports of the reopened final-model phase:
+
+- [22_swin_tiny_ft_aug.md](experiments/22_swin_tiny_ft_aug.md): Swin-Tiny partial fine-tuning with `full_aug`
+- [23_swin_needs_review_threshold.md](experiments/23_swin_needs_review_threshold.md): Swin `needs_review` threshold selection
+- [24_swin_final_test_evaluation.md](experiments/24_swin_final_test_evaluation.md): Swin final Test evaluation (second use of the frozen Test set)
+- [25_swin_neysan_evaluation.md](experiments/25_swin_neysan_evaluation.md): Swin Neysan evaluation
+
+### Original selection: `resnet224_ft_aug` (historical)
+
 Selected on validation only (see [10_final_model_selection.md](experiments/10_final_model_selection.md)):
 **`resnet224_ft_aug`**, checkpoint `checkpoints/resnet224_ft_aug_best.pt` (epoch 20). Its validation
-results are accuracy 0.9605, macro precision 0.9456, macro recall 0.9523 and macro F1 0.9482; it has
-the highest macro F1 of all runs. Known weaknesses are vanet (F1 0.8214, precision 0.7667) and the
+results are accuracy 0.9605, macro precision 0.9456, macro recall 0.9523 and macro F1 0.9482; it had
+the highest macro F1 of the runs available at that time. Known weaknesses are vanet (F1 0.8214, precision 0.7667) and the
 kamyun / kamyunet confusion. The test set was not used for this selection; it was evaluated once
 afterwards (see below).
 
@@ -128,6 +153,27 @@ flags 35 of 659 images, 13 of the 26 errors and 22 correct predictions, and leav
 The test set was not used to choose it.
 
 ## Final Test evaluation
+
+### Current final model `swin_t_ft_aug` (second use of the frozen Test set)
+
+[24_swin_final_test_evaluation.md](experiments/24_swin_final_test_evaluation.md) (per-image predictions:
+[24_swin_final_test_predictions.csv](experiments/24_swin_final_test_predictions.csv)). Status: completed,
+run once (`swin_final_test_20261004T163946Z`) with `scripts/evaluate_test_swin.py` at commit `817b61e`,
+after `swin_t_ft_aug` was selected on validation only and the 0.95 threshold was fixed. This is the second
+use of the same frozen test set, a documented protocol deviation; the result is not a pristine held-out
+estimate. It was not used for model or threshold selection. The historical ResNet Test outputs (`12_*`)
+were only hashed, before and after the run, and are unchanged.
+
+| Test (400 images) | Value |
+|---|---|
+| Correct / incorrect | 382 / 18 |
+| Accuracy | 0.9550 |
+| Macro precision | 0.9558 |
+| Macro recall | 0.9550 |
+| Macro F1 | 0.9545 |
+| `needs_review` (confidence < 0.95) | 40 (28 correct, 12 incorrect); 6 errors not flagged |
+
+### Original final model `resnet224_ft_aug` (historical, first use)
 
 [12_final_test_evaluation.md](experiments/12_final_test_evaluation.md) (per-image predictions:
 [12_final_test_predictions.csv](experiments/12_final_test_predictions.csv)). Status: completed, run
@@ -146,6 +192,28 @@ set (`decisions/test_frozen.csv`, 400 images, 50 per class) and the frozen check
 | `needs_review` (confidence < 0.90) | 29 (17 correct, 12 incorrect); 9 errors not flagged |
 
 ## Neysan evaluation
+
+### Final model `swin_t_ft_aug`
+
+[25_swin_neysan_evaluation.md](experiments/25_swin_neysan_evaluation.md) (per-image predictions:
+[25_swin_neysan_predictions.csv](experiments/25_swin_neysan_predictions.csv)). Status: completed, run once
+(`swin_neysan_20261005T143443Z`) with `scripts/evaluate_neysan_swin.py` at commit `bdbe67c`, with the
+`swin_t_ft_aug` checkpoint and the 0.95 threshold unchanged. A confirmed Neysan image predicted as `vanet`
+is not considered a classification error, because Neysan belongs to the `vanet` class in the 8-class
+taxonomy. For confirmed Neysan not from v1/test, 302 of 337 were predicted `vanet` and 101 of 337 (30.0%)
+were flagged `needs_review`, against 4 of 26 (15.4%) ordinary validation `vanet` images (+14.6 points);
+32 of the 35 non-`vanet` predictions were flagged.
+
+Neysan remains an unseen subtype of `vanet` and is not treated as a separate class. The Swin-Tiny
+model does not identify Neysan as a distinct subtype. However, confirmed Neysan images produced a higher
+human-review rate than ordinary validation `vanet` images (30.0% vs 15.4%). Among confirmed Neysan cases
+that were not predicted as `vanet`, most were flagged for human review. This supports `needs_review` as a
+robustness and human-review mechanism, but does not establish Neysan detection or guarantee detection of
+Neysan in the mentor-held Test set.
+
+The results are descriptive only; no model, threshold, label or Test decision was made from them.
+
+### Previous final model `resnet224_ft_aug` (historical)
 
 [13_neysan_unclean_analysis.md](experiments/13_neysan_unclean_analysis.md) (per-image predictions:
 [13_neysan_predictions.csv](experiments/13_neysan_predictions.csv)). Status: completed, run once

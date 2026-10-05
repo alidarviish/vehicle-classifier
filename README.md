@@ -22,9 +22,12 @@ hashes are recorded (`decisions/`, reports).
    the selection was later reopened and `swin_t_ft_aug` was selected
    ([decision](decisions/REOPEN_FINAL_MODEL_SELECTION.md)). The `needs_review` threshold is also
    chosen on validation.
-6. **Test.** The frozen 400-image Test set was evaluated once for `resnet224_ft_aug`. A second
-   evaluation for `swin_t_ft_aug` is a documented protocol deviation and has not been run yet.
-7. **Neysan evaluation.** A separate, inference-only analysis of 621 Neysan images.
+6. **Test.** The frozen 400-image Test set was evaluated once for `resnet224_ft_aug`. After
+   `swin_t_ft_aug` was selected on validation only, the same Test set was evaluated once more for it
+   ([report](reports/experiments/24_swin_final_test_evaluation.md)). This second use is a documented
+   protocol deviation, so that result is not a pristine held-out estimate.
+7. **Neysan evaluation.** A separate, inference-only analysis of 621 Neysan images (an unseen subtype
+   of `vanet`, not a class), run once for `resnet224_ft_aug` and once for `swin_t_ft_aug`.
 
 ## Setup
 
@@ -61,6 +64,7 @@ The data scripts only read the raw images.
 | ResNet setup checks (no data) | `python scripts/verify_resnet.py` |
 | Test evaluation (done once, historical `resnet224_ft_aug`) | `python scripts/evaluate_test.py` |
 | Neysan evaluation (done once, historical `resnet224_ft_aug`) | `python scripts/evaluate_neysan.py` |
+| Neysan evaluation (done once, final model `swin_t_ft_aug`) | `python scripts/evaluate_neysan_swin.py --visibility-tags <tags.csv> --val-baseline <val_predictions.csv>` |
 | Prediction (JSON) | `python -m src.predict path/to/image.jpg [more images]` |
 
 Notes on the commands:
@@ -75,7 +79,8 @@ Notes on the commands:
 - **One-time scripts.** `evaluate_test.py` and `evaluate_neysan.py` refuse to run again once their
   outputs exist. Both are fixed to the previous final model `resnet224_ft_aug` (checkpoint SHA256
   and threshold 0.90) and are kept unchanged as historical scripts; they do not evaluate
-  `swin_t_ft_aug`.
+  `swin_t_ft_aug`. `evaluate_neysan_swin.py` evaluates `swin_t_ft_aug` on the same Neysan set, writes
+  only the `25_*` outputs and also refuses to run again.
 
 ## Final model
 
@@ -97,7 +102,10 @@ Selected after the project was reopened; see
   ([report](reports/experiments/23_swin_needs_review_threshold.md)) and is defined in
   `src/predict.py`. It is only a flag for human review; no prediction is rejected. The threshold is
   not stored in the frozen checkpoint.
-- **Final Test:** not run yet for this model.
+- **Final Test:** run once for this model, after it was selected on validation only
+  ([report](reports/experiments/24_swin_final_test_evaluation.md)): accuracy 0.9550, macro F1 0.9545
+  (382 / 400). This is the second use of the frozen Test set, a documented protocol deviation; the
+  result is not a pristine held-out estimate and was not used for model selection or the threshold.
 
 ### Previous final model (historical)
 
@@ -107,7 +115,7 @@ Selected after the project was reopened; see
 - **Validation:** accuracy 0.9605, macro precision 0.9456, macro recall 0.9523, macro F1 0.9482.
 - **`needs_review` threshold:** 0.90
   ([report](reports/experiments/11_needs_review_threshold.md)).
-- The Test and Neysan results below belong to this model.
+- The Frozen Test results below and the historical Neysan results (`13_*`) belong to this model.
 
 ## Frozen Test (previous final model, `resnet224_ft_aug`)
 
@@ -127,14 +135,44 @@ Selected after the project was reopened; see
   class. Neysan images were kept out of training, validation and Test.
 - **Evaluation set:** `decisions/neysan_eval.csv`, 621 images. 371 are human-confirmed; 250 come from
   the `neysan` folders (policy N1) and were not individually reviewed.
-- **Inference only:** the set was evaluated with the previous final model `resnet224_ft_aug`
-  (threshold 0.90), and each image is expected to be predicted as `vanet`. It has not been
-  evaluated with `swin_t_ft_aug`.
+- **Expected label:** each image is expected to be predicted as `vanet`. A confirmed Neysan image
+  predicted as `vanet` is not considered a classification error, because Neysan belongs to the
+  `vanet` class in the 8-class taxonomy.
+- **Three separate questions:** 8-class classification (is the image predicted `vanet`?), human
+  review (is it flagged `needs_review`?) and subtype identification (is it recognised as Neysan?).
+  The model can only be assessed on the first two; it has no output for the third.
+
+### Final model `swin_t_ft_aug` (threshold 0.95)
+
+Inference only, run once; [report](reports/experiments/25_swin_neysan_evaluation.md), per-image output
+`reports/experiments/25_swin_neysan_predictions.csv`. Results are reported separately for confirmed Neysan
+not from v1/test (337), confirmed Neysan from v1/test (34) and N1 (250).
+
+- **Classification (confirmed, not from v1/test):** 302 of 337 predicted `vanet`.
+- **Human review (confirmed, not from v1/test):** 101 of 337 flagged (30.0%), against 4 of 26 ordinary
+  validation `vanet` images (15.4%): +14.6 percentage points. The validation baseline is small, so the
+  size of this difference is imprecise.
+- **Non-`vanet` predictions (confirmed, not from v1/test):** 35, of which 32 were flagged for review.
+
+Neysan remains an unseen subtype of `vanet` and is not treated as a separate class. The Swin-Tiny
+model does not identify Neysan as a distinct subtype. However, confirmed Neysan images produced a higher
+human-review rate than ordinary validation `vanet` images (30.0% vs 15.4%). Among confirmed Neysan cases
+that were not predicted as `vanet`, most were flagged for human review. This supports `needs_review` as a
+robustness and human-review mechanism, but does not establish Neysan detection or guarantee detection of
+Neysan in the mentor-held Test set.
+
+The evaluation does not estimate Neysan prevalence in a mixed stream, and does not establish
+calibration, generalisation to other conditions or performance on the mentor-held Test set.
+
+### Previous final model `resnet224_ft_aug` (historical, threshold 0.90)
+
+- **Inference only:** the set was evaluated once with `resnet224_ft_aug`; these results are unchanged.
 - **Results:** 529 of 621 were predicted `vanet` (0.8519; 0.8544 on the 371 confirmed images), and
   185 were flagged `needs_review`.
 - **Per-image output:** predictions and all 8 class probabilities are in
   `reports/experiments/13_neysan_predictions.csv`.
-- **Descriptive only.** No precision, F1 or macro metric is reported for this set.
+- **Descriptive only.** No precision, F1 or macro metric is reported for this set. Flag counts are not
+  comparable with the Swin-Tiny run, because the thresholds differ.
 
 ## Architecture comparisons
 
@@ -172,6 +210,7 @@ Run after the original final model was fixed. The EfficientNet-B0 comparison did
 - [ResNet18 experiments](reports/experiments/08_resnet.md)
 - [Final Test evaluation (ResNet, historical)](reports/experiments/12_final_test_evaluation.md)
 - [Neysan / unclean analysis (ResNet, historical)](reports/experiments/13_neysan_unclean_analysis.md)
+- [Neysan evaluation (Swin-Tiny, final model)](reports/experiments/25_swin_neysan_evaluation.md)
 - [Dataset decisions](docs/DATA_DECISIONS.md)
 
 ## Reproducibility
@@ -199,7 +238,9 @@ Run after the original final model was fixed. The EfficientNet-B0 comparison did
   images are `vanet`.
 - **Overfitting.** The final model shows signs of overfitting in the last epochs: validation loss
   is lowest at epoch 11 while train loss keeps falling; the selected epoch is 17 of 20.
-- **Test.** Test was run once, for the previous final model `resnet224_ft_aug`; its result is a
-  single estimate without a confidence interval. The final model `swin_t_ft_aug` has no Test
-  result yet; a second Test evaluation would be a documented protocol deviation, not an
-  untouched held-out estimate.
+- **Test.** Test was first run once for the previous final model `resnet224_ft_aug`. After
+  `swin_t_ft_aug` was selected on validation only, Test was run once more for it
+  ([report](reports/experiments/24_swin_final_test_evaluation.md)). This second use of the frozen
+  Test set is a documented protocol deviation, so the Swin result is not a pristine held-out
+  estimate; it was not used for model or threshold selection. Each result is a single estimate
+  without a confidence interval.
