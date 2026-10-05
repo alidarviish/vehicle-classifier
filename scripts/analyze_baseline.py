@@ -227,6 +227,12 @@ def main():
 
     run_name = args.run_name
     history_path, checkpoint_path, OUT_DIR = run_paths(run_name)
+    outputs = ["loss_curves.png", "val_f1_curve.png", "baseline_analysis.txt"]
+    if not args.history_only:
+        outputs += ["confusion_matrix.csv", "confusion_matrix.png", "per_class_metrics.csv"]
+    for name in outputs:
+        if (OUT_DIR / name).exists():
+            raise FileExistsError(f"refusing to overwrite {OUT_DIR / name}")
     OUT_DIR.mkdir(parents=True, exist_ok=True)
     history = read_history(history_path)
     best = best_epoch_row(history)

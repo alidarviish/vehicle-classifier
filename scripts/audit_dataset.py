@@ -60,6 +60,9 @@ def describe_relation(members):
 
 
 def main():
+    for path in (TEXT_REPORT, DUPLICATES_CSV):
+        if path.exists():
+            raise FileExistsError(f"refusing to overwrite {path}")
     rows = read_manifest(MANIFEST_PATH)
     groups = find_duplicate_groups(rows)
 
@@ -120,9 +123,9 @@ def main():
             report.append(f"    {m['image_path']}  (folder_label={m['folder_label']})")
 
     REPORT_DIR.mkdir(parents=True, exist_ok=True)
-    with open(TEXT_REPORT, "w", encoding="utf-8") as f:
+    with open(TEXT_REPORT, "x", encoding="utf-8") as f:
         f.write("\n".join(report) + "\n")
-    with open(DUPLICATES_CSV, "w", newline="", encoding="utf-8") as f:
+    with open(DUPLICATES_CSV, "x", newline="", encoding="utf-8") as f:
         columns = ["group_id", "sha256", "n_files", "relation", "label_conflict",
                    "image_path", "source", "origin_split", "folder_label"]
         writer = csv.DictWriter(f, fieldnames=columns)

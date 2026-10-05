@@ -429,6 +429,8 @@ def train(run_name, manifest_path, config_path, epochs=EPOCHS, augmentation="non
         if not run_name.startswith(SWIN_RUN_PREFIX):
             raise ValueError(f"Swin-Tiny run names must start with '{SWIN_RUN_PREFIX}', got '{run_name}'")
         refuse_existing_run(run_name)
+    if not (is_resnet or is_effnet or is_convnext or is_swin):
+        refuse_existing_run(run_name)   # the baseline CNN runs are never overwritten either
     set_seed()
     REPORTS_DIR.mkdir(exist_ok=True)
     CHECKPOINT_DIR.mkdir(exist_ok=True)

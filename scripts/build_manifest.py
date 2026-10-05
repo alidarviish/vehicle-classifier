@@ -112,6 +112,8 @@ def main():
 
     roots = load_source_roots(args.config)
     out_path = Path(args.out)
+    if out_path.exists():   # checked before the (slow) scan; nothing is read or written
+        raise FileExistsError(f"refusing to overwrite {out_path}")
 
     # Safety check: never write the manifest inside a raw dataset folder.
     for root in roots.values():
@@ -128,7 +130,7 @@ def main():
         print(f"  {len(rows)} images, {len(skipped)} skipped files")
 
     out_path.parent.mkdir(parents=True, exist_ok=True)
-    with open(out_path, "w", newline="", encoding="utf-8") as f:
+    with open(out_path, "x", newline="", encoding="utf-8") as f:   # "x": never overwrite
         writer = csv.DictWriter(f, fieldnames=COLUMNS)
         writer.writeheader()
         writer.writerows(all_rows)
