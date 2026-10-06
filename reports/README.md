@@ -1,6 +1,6 @@
 # Reports index
 
-Validation results of every experiment up to the original final model selection (split
+Validation results of every experiment run documented in `experiments/` (split
 `data/split_manifest.csv`, train / validation = 2633 / 659 unless noted, seed 42; each run was trained once). Metrics are for
 the checkpoint with the highest validation macro F1. All metrics in this index are validation
 results. The frozen test set was first evaluated once for the original final model
@@ -38,10 +38,18 @@ for any decision.
 | [ResNet18](experiments/08_resnet.md) | `resnet_finetuning` | 7 | 0.9241 | 0.9173 | 0.9168 | 0.9165 | Exploratory run at 128x128 input |
 | [Combined](experiments/09_combined_aug_plateau.md) | `combo_aug_plateau` | 18 | 0.8983 | 0.8875 | 0.8844 | 0.8853 | `full_aug` + ReduceLROnPlateau (0.5, 3); lr halved after epochs 13 and 18 |
 | [Combined](experiments/09_combined_aug_plateau.md) | `combo_aug_do05_wd1e4_plateau` | 14 | 0.8847 | 0.8682 | 0.8552 | 0.8590 | As above + dropout 0.5 + AdamW weight decay 1e-4; lr never reduced |
+| [EfficientNet-B0](experiments/14_efficientnet_b0_ft_baseline.md) | `effnet_b0_ft_none` | 19 | 0.9560 | 0.9469 | 0.9518 | 0.9485 | Pretrained EfficientNet-B0, 224x224; classifier only in epochs 1-5, then `features[6:9]` + classifier; EfficientNet-B0 reference run |
+| [EfficientNet-B0](experiments/15_efficientnet_b0_ft_lr5e5.md) | `effnet_b0_ft_lr5e5_none` | 15 | 0.9469 | 0.9339 | 0.9399 | 0.9356 | As `effnet_b0_ft_none`, learning rate of `features[6:9]` 5e-5 instead of 1e-4 |
+| [EfficientNet-B0](experiments/16_efficientnet_b0_ft_aug_review.md) | `effnet_b0_ft_aug` | 19 | 0.9530 | 0.9425 | 0.9531 | 0.9466 | As `effnet_b0_ft_none` + train-only `full_aug` |
+| [ConvNeXt-Tiny](experiments/17_convnext_tiny_fe_none.md) | `convnext_t_fe_none` | 18 | 0.9393 | 0.9358 | 0.9368 | 0.9358 | Pretrained ConvNeXt-Tiny, 224x224, backbone frozen, only the classifier trained |
+| [ConvNeXt-Tiny](experiments/18_convnext_tiny_ft_none.md) | `convnext_t_ft_none` | 13 | 0.9590 | 0.9550 | 0.9542 | 0.9538 | Classifier only in epochs 1-5, then `features[6:8]` + classifier |
+| [ConvNeXt-Tiny](experiments/19_convnext_tiny_ft_aug.md) | `convnext_t_ft_aug` | 11 | 0.9590 | 0.9559 | 0.9557 | 0.9557 | As `convnext_t_ft_none` + train-only `full_aug` |
+| [Swin-Tiny](experiments/20_swin_tiny_fe_none.md) | `swin_t_fe_none` | 19 | 0.9423 | 0.9447 | 0.9298 | 0.9363 | Pretrained Swin-Tiny, 224x224, backbone frozen, only the head trained |
+| [Swin-Tiny](experiments/21_swin_tiny_ft_none.md) | `swin_t_ft_none` | 13 | 0.9621 | 0.9565 | 0.9619 | 0.9582 | Head only in epochs 1-5, then `features[6:8]` + `norm` + head |
+| [Swin-Tiny](experiments/22_swin_tiny_ft_aug.md) | `swin_t_ft_aug` | 17 | 0.9712 | 0.9626 | 0.9698 | 0.9658 | As `swin_t_ft_none` + train-only `full_aug`; current final model (`decisions/REOPEN_FINAL_MODEL_SELECTION.md`) |
 
-The later architecture comparisons (EfficientNet-B0, ConvNeXt-Tiny, Swin-Tiny; reports 14-22),
-including the current final model `swin_t_ft_aug`, are not in this table; see those reports and
-[Final model selection](#final-model-selection).
+`effnet_b0_fe_none` has no report of its own; its accuracy (0.9363) and macro F1 (0.9261) are recorded
+in `17_convnext_tiny_fe_none.md`.
 
 Experiments 01-05 and 07 each change one factor relative to the baseline setup. Experiment 06
 trains the baseline model on a simulated-imbalance subset of the training split and compares its two
@@ -51,7 +59,9 @@ with train-only augmentation (`resnet224_ft_aug`), with weight decay (`resnet224
 a scheduler (`resnet224_ft_plateau`), and one combination of all three
 (`resnet224_ft_aug_wd1e4_plateau`). Experiment 09 tests two
 combinations on the baseline CNN (augmentation + scheduler, then also dropout + weight decay). See
-the linked report for the exact settings, per-class results and limitations.
+the linked report for the exact settings, per-class results and limitations. Experiments 14-22 compare EfficientNet-B0,
+ConvNeXt-Tiny and Swin-Tiny with the same split, 224x224 input and ImageNet normalization; experiment 22
+(`swin_t_ft_aug`) became the final model.
 
 ## Validation comparison table
 
