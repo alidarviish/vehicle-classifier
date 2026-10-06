@@ -4,6 +4,12 @@ Status: model selected on validation. The test set played no part in this select
 evaluated once afterwards, after this selection, the `needs_review` threshold and the inference
 protocol were fixed (see `12_final_test_evaluation.md`). The Neysan images were not used.
 
+Current status: this selection is historical. The final model selection was later reopened on
+validation only, and `swin_t_ft_aug` is the current final model
+(`decisions/REOPEN_FINAL_MODEL_SELECTION.md`, commit `76669f4`; used by `src/predict.py` since commit
+`a81184a`). The selection, results and checkpoint of `resnet224_ft_aug` in this report are unchanged.
+Statements about `src/predict.py` below describe the code at the time of this selection.
+
 ## Candidates and rule
 
 The candidates are the six 224x224 ResNet18 runs of `08_resnet.md`, the best-performing family of

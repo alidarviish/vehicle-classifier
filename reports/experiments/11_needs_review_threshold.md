@@ -6,6 +6,11 @@ Status: threshold decided on validation (0.90) and used in `src/predict.py`. The
 once afterwards with this threshold (see `12_final_test_evaluation.md`). The Neysan images were not
 used.
 
+Current status: 0.90 remains the historical threshold decision for `resnet224_ft_aug`. Since commit
+`a81184a`, `src/predict.py` uses `swin_t_ft_aug` with `NEEDS_REVIEW_THRESHOLD = 0.95`
+(`23_swin_needs_review_threshold.md`, `decisions/REOPEN_FINAL_MODEL_SELECTION.md`). Statements below
+that 0.90 is defined in or used by `src/predict.py` describe the code at the time of this report.
+
 ## Purpose
 
 `needs_review` is a human-review flag only. A prediction whose top softmax probability (confidence)

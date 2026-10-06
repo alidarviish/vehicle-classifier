@@ -5,6 +5,11 @@ Third Swin-Tiny run in the architecture comparison. One factor changes against `
 is the same. This is an architecture comparison only; it does not change the final model of the
 project (`resnet224_ft_aug`).
 
+Current status: after this report, the final model selection was reopened and `swin_t_ft_aug` was
+selected on validation (`decisions/REOPEN_FINAL_MODEL_SELECTION.md`, commit `76669f4`). The
+statements in this report that the final model stays `resnet224_ft_aug` describe the state when it
+was written.
+
 ## Setup
 
 - Run name: `swin_t_ft_aug`

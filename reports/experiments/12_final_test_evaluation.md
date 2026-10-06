@@ -130,3 +130,12 @@ Observations (from the CSV only):
   `needs_review` threshold (`11_needs_review_threshold.md`); both were decided on validation.
 - Neysan evaluation was not part of this run.
 - Per-image predictions: `reports/experiments/12_final_test_predictions.csv`.
+
+## Later note (documentation only)
+
+The final model selection was later reopened on validation only
+(`decisions/REOPEN_FINAL_MODEL_SELECTION.md`), and `swin_t_ft_aug` became the current final model.
+This report remains the historical first evaluation of the frozen Test set, for `resnet224_ft_aug`;
+its results are unchanged. The second evaluation, for `swin_t_ft_aug`, is in
+`24_swin_final_test_evaluation.md`. `src/predict.py` has changed since; the "Inference" line above
+describes the code at commit `b02782f`.

@@ -3,7 +3,8 @@
 This file records the evidence collected about the boundary between `kamyun` and `kamyunet`. It is
 documentation only. No label, split, image, checkpoint, Test or Neysan file was changed, and no
 training, inference or new experiment was run for these audits. The validation predictions used
-below are the existing ones of the final model `resnet224_ft_aug`
+below are the existing ones of `resnet224_ft_aug`, the final model at the time of this audit
+(see `decisions/REOPEN_FINAL_MODEL_SELECTION.md`)
 (`reports/analysis/resnet224_ft_aug/val_audit/val_predictions.csv`, generated, not tracked).
 
 ## 1. Status

@@ -109,6 +109,18 @@ The selection uses validation metrics only.
    record; confirm that `test_frozen.csv` is unchanged and that no earlier output was
    overwritten.
 
+## Follow-up status (added later)
+
+1. Threshold: done, 0.95 on validation (`23_swin_needs_review_threshold.md`, commit `41df725`).
+2. `src/predict.py`: done, Swin-Tiny with 0.95 (commit `a81184a`); item 2 above describes the code
+   at decision time.
+3. Checkpoint and metadata: recorded in `README.md` and reports 22 and 23.
+4. New Final Test: done, `24_swin_final_test_evaluation.md` (commits `817b61e`, `b93560d`); the
+   results of `12_final_test_evaluation.md` remain unchanged.
+5. Neysan: done, `25_swin_neysan_evaluation.md` (commits `bdbe67c`, `0083791`);
+   `13_neysan_unclean_analysis.md` remains unchanged.
+6. Documentation: README updated (`4bb39db`); status notes added to reports 10, 11, and 12.
+
 ## Timeline
 
 | Date | Commit | Event |
