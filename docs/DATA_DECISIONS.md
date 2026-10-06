@@ -65,6 +65,12 @@ After a visual review of baseline validation errors, 8 validation images were re
 
 `KEEP_*` and `UNCERTAIN` decisions (including KN04, still `UNCERTAIN`) do not change labels.
 
+- Later audits of the kamyun / kamyunet boundary (`decisions/KAMYUN_KAMYUNET_AMBIGUITY.md`,
+  `decisions/KAMYUN_KAMYUNET_SHARED_CONFIGURATIONS.md`) recorded the status PARTIAL DISTINCTION ONLY,
+  DEFINITION NOT RECOVERED. The four blind-review candidates (C05, C06, C14, C15) were not
+  relabelled; no label changed after the 8 corrections above. The two classes are kept separate
+  (`reports/experiments/10_final_model_selection.md`).
+
 ## Test (frozen)
 
 - 400 images, 50 per class (`scripts/build_test.py`).
