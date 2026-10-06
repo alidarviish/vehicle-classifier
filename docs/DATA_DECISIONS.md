@@ -76,7 +76,9 @@ After a visual review of baseline validation errors, 8 validation images were re
 - Checks at freeze time: no `CONFIRMED_NEYSAN`, no exact duplicate between Test and train/val,
   no exact duplicate inside Test, no excluded image. The 8 excluded unclean images that are exact
   copies of Test images stay excluded.
-- Test is used once, for final evaluation. It is not in `data/split_manifest.csv`.
+- Test was used once for the final evaluation of `resnet224_ft_aug`, and a second time for
+  `swin_t_ft_aug` after the reopened selection, a documented protocol deviation
+  (`reports/experiments/24_swin_final_test_evaluation.md`). It is not in `data/split_manifest.csv`.
 
 ## Train / validation split
 

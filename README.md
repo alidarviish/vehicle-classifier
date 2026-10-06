@@ -183,7 +183,7 @@ Run after the original final model was fixed. The EfficientNet-B0 comparison did
 
 - **Tried:** feature extraction, then partial fine-tuning (the last three feature stages unfrozen from
   epoch 6), a lower learning rate for those stages, and `full_aug`.
-- **Best run so far:** `effnet_b0_ft_none` (partial fine-tuning, no augmentation), validation accuracy
+- **Best EfficientNet-B0 run:** `effnet_b0_ft_none` (partial fine-tuning, no augmentation), validation accuracy
   0.9560 and macro F1 0.9485.
 - **Learning rate:** 5e-5 for the fine-tuned stages was not better than the baseline 1e-4 in this setup.
 - **Augmentation:** `full_aug` gave macro F1 0.9466, with no overall improvement over the baseline, so the
@@ -225,8 +225,10 @@ Run after the original final model was fixed. The EfficientNet-B0 comparison did
   `reports/experiments/22_swin_tiny_ft_aug.md`. The previous final checkpoint SHA256 is recorded in
   `reports/experiments/10_final_model_selection.md`; `evaluate_test.py` and `evaluate_neysan.py`
   check that one before predicting.
-- **Before/after hashes.** The Neysan report records the SHA256 of the ResNet checkpoint,
-  `test_frozen.csv`, `split_manifest.csv` and `neysan_eval.csv`, before and after inference.
+- **Before/after hashes.** The historical ResNet Neysan report (`13_neysan_unclean_analysis.md`)
+  records the SHA256 of the ResNet checkpoint, `test_frozen.csv`, `split_manifest.csv` and
+  `neysan_eval.csv`, before and after inference. The Swin reports 24 and 25 record the checkpoint and
+  manifest SHA256 and check that they are unchanged after inference.
 - **Not in Git:** raw images, checkpoints, histories, analysis output and local paths.
 
 ## Limitations

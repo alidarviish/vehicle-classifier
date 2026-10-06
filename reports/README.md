@@ -1,7 +1,7 @@
 # Reports index
 
-Validation results of every experiment run so far (split `data/split_manifest.csv`,
-train / validation = 2633 / 659 unless noted, seed 42; each run was trained once). Metrics are for
+Validation results of every experiment up to the original final model selection (split
+`data/split_manifest.csv`, train / validation = 2633 / 659 unless noted, seed 42; each run was trained once). Metrics are for
 the checkpoint with the highest validation macro F1. All metrics in this index are validation
 results. The frozen test set was first evaluated once for the original final model
 `resnet224_ft_aug`, after its model, `needs_review` threshold and inference protocol were fixed. The
@@ -38,6 +38,10 @@ for any decision.
 | [ResNet18](experiments/08_resnet.md) | `resnet_finetuning` | 7 | 0.9241 | 0.9173 | 0.9168 | 0.9165 | Exploratory run at 128x128 input |
 | [Combined](experiments/09_combined_aug_plateau.md) | `combo_aug_plateau` | 18 | 0.8983 | 0.8875 | 0.8844 | 0.8853 | `full_aug` + ReduceLROnPlateau (0.5, 3); lr halved after epochs 13 and 18 |
 | [Combined](experiments/09_combined_aug_plateau.md) | `combo_aug_do05_wd1e4_plateau` | 14 | 0.8847 | 0.8682 | 0.8552 | 0.8590 | As above + dropout 0.5 + AdamW weight decay 1e-4; lr never reduced |
+
+The later architecture comparisons (EfficientNet-B0, ConvNeXt-Tiny, Swin-Tiny; reports 14-22),
+including the current final model `swin_t_ft_aug`, are not in this table; see those reports and
+[Final model selection](#final-model-selection).
 
 Experiments 01-05 and 07 each change one factor relative to the baseline setup. Experiment 06
 trains the baseline model on a simulated-imbalance subset of the training split and compares its two
