@@ -141,6 +141,9 @@ Train + validation = 3292 images.
 - One exact-duplicate pair is inside the set: `v1/train/vanet/214844236.jpg` and
   `v1/unclean/neysan/214844236.jpg`.
 - No `NOT_NEYSAN` and no excluded image is in the set, and none of its images is in train, val or Test.
+- The images are not copied: `decisions/neysan_eval.csv` points to them in their original folders
+  (`vanet` for the confirmed images, `unclean/neysan` for N1) and is the only Neysan input of
+  `scripts/evaluate_neysan.py` and `scripts/evaluate_neysan_swin.py`.
 
 ## Data location
 

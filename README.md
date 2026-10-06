@@ -137,6 +137,9 @@ Selected after the project was reopened; see
   class. Neysan images were kept out of training, validation and Test.
 - **Evaluation set:** `decisions/neysan_eval.csv`, 621 images. 371 are human-confirmed; 250 come from
   the `neysan` folders (policy N1) and were not individually reviewed.
+- **Input and image location:** `decisions/neysan_eval.csv` is the only Neysan input of the evaluation
+  scripts. The 621 images stay in the raw datasets (not in Git): the 371 human-confirmed images in
+  `vanet` folders and the 250 N1 images in the `<source>/unclean/neysan/` folders.
 - **Expected label:** each image is expected to be predicted as `vanet`. A confirmed Neysan image
   predicted as `vanet` is not considered a classification error, because Neysan belongs to the
   `vanet` class in the 8-class taxonomy.
