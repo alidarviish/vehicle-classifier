@@ -164,8 +164,4 @@ Train + validation = 3292 images.
 
 The inputs and lists that were missing are now in the repository:
 `decisions/old_label_overrides.csv`, `decisions/test_frozen.csv` (400 images) and
-`decisions/neysan_eval.csv` (621 images). The one remaining gap is outside the repository:
-
-- The local snapshot outside the repository (folder and zip) no longer contains `snapshot_manifest.csv`,
-  so its files are only traceable through their names
-  (`<source>_<origin_split>_<file>`).
+`decisions/neysan_eval.csv` (621 images).

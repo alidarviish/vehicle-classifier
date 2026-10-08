@@ -69,7 +69,7 @@ The data scripts only read the raw images.
 | Neysan evaluation (done once, final model `swin_t_ft_aug`) | `python scripts/evaluate_neysan_swin.py --visibility-tags <tags.csv> --val-baseline <val_predictions.csv>` |
 | Prediction (JSON) | `python -m src.predict path/to/image.jpg [more images]` |
 | Test the final model on a folder of new images (mentor test) | `python run_test.py --input <folder>`, see [docs/MENTOR_TEST_GUIDE.md](docs/MENTOR_TEST_GUIDE.md) |
-| Build the Neysan detector (re-run; writes a new file) | `python scripts/build_neysan_detector.py --data <clean_dataset folder> --neysan-zip <neysan_images.zip>` |
+| Build the Neysan detector (re-run; writes a new file) | `python scripts/build_neysan_detector.py` |
 
 Notes on the commands:
 

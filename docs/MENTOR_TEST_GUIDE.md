@@ -25,7 +25,7 @@ The runner checks the SHA256 of the model file and of the detector before predic
   - Put both in `checkpoints/`, or pass their paths with `--checkpoint` and `--neysan-detector`.
 - **Python packages:**
   - Python 3.9+ with `torch`, `torchvision`, `Pillow`, `numpy`, `matplotlib`.
-  - Install them with `pip install -r requirements.txt`. Colab already has them.
+  - Install them with `pip install -r requirements.txt`.
 
 ## Test folder layout
 
@@ -67,17 +67,6 @@ On Windows, put paths with spaces in quotes: `--input "D:\mentor data\TEST"`.
 | `--no-neysan-detector` | plain 8-class output, never `unknown` |
 | `--batch-size` | images per step (default 32); lower it if the GPU runs out of memory |
 | `--device` | `auto` (GPU if available), `cpu` or `cuda` |
-
-## Run in Google Colab (optional, for a GPU)
-
-The same `run_test.py` runs in Colab. Put the project zip, the model, the detector and the test
-images on Google Drive, then run in a Colab cell (adjust the paths):
-
-```
-from google.colab import drive; drive.mount("/content/drive")
-!unzip -q "/content/drive/MyDrive/vehicle_classifier/vehicle-classifier.zip" -d /content
-!cd /content/vehicle-classifier && python run_test.py --input "/content/drive/MyDrive/vehicle_classifier/TEST" --output "/content/drive/MyDrive/vehicle_classifier/results" --checkpoint "/content/drive/MyDrive/vehicle_classifier/swin_t_ft_aug_best.pt" --neysan-detector "/content/drive/MyDrive/vehicle_classifier/neysan_detector.json"
-```
 
 ## Result files
 

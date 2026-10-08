@@ -1,6 +1,9 @@
 """Build the Neysan detector used by run_test.py (docs/NEYSAN_REJECTION.md).
 
-    python scripts/build_neysan_detector.py --data <clean_dataset folder> --neysan-zip <neysan_images.zip>
+    python scripts/build_neysan_detector.py
+
+Images are read like everywhere else in the project: train / validation from data/split_manifest.csv,
+Neysan from decisions/neysan_eval.csv, local folders from configs/local_paths.json.
 
 Nothing here trains or changes the 8-class model. Steps:
   1. load the frozen final model and take the 768-number feature vector of every image
@@ -22,13 +25,10 @@ GPU) can differ in the last decimals and therefore has a different SHA256.
 import argparse
 import csv
 import hashlib
-import io
 import json
-import os
 import random
 import sys
 import time
-import zipfile
 from pathlib import Path
 
 import numpy as np
@@ -37,31 +37,19 @@ from PIL import Image
 REPO_ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(REPO_ROOT))
 
-from src.dataset import CLASSES  # noqa: E402
+from src.dataset import (CLASSES, DEFAULT_CONFIG, DEFAULT_MANIFEST, load_source_roots,  # noqa: E402
+                         read_split_rows, resolve_image_path)
 from src.test_runner import (DEFAULT_CHECKPOINT, DEFAULT_DETECTOR, FINAL_CHECKPOINT_SHA256,  # noqa: E402
                              NeysanDetector, sha256_of)
 
-NEYSAN_ZIP_SHA256 = "dca996f373faa130e08bc9b4700643e4ad04ce55a73ea428d02f3d15867e7956"
+NEYSAN_MANIFEST = REPO_ROOT / "decisions" / "neysan_eval.csv"
+NEYSAN_MANIFEST_SHA256 = "1e8cad9bbca206740f78dda72da6318c8851d6f56ec17281317048308576086a"
 THRESHOLD = 0.5   # fixed in advance, not tuned
 SEED = 42
 
 
-def folder_images(split_dir):
-    """All images of one split as (path, class), in a fixed order."""
-    items = []
-    for c in CLASSES:
-        for root, _, files in os.walk(split_dir / c):
-            for f in files:
-                p = Path(root) / f
-                items.append((p.relative_to(split_dir).as_posix(), p, c))
-    items.sort()
-    return [(p, c) for _, p, c in items]
-
-
 def main():
     ap = argparse.ArgumentParser(description="Build the Neysan detector (logistic regression on model features).")
-    ap.add_argument("--data", required=True, help="clean_dataset folder (with train/ and val/)")
-    ap.add_argument("--neysan-zip", required=True, help="neysan_images.zip (images + neysan/neysan_manifest.csv)")
     ap.add_argument("--output", default=str(DEFAULT_DETECTOR.with_name("neysan_detector_rerun.json")))
     ap.add_argument("--batch-size", type=int, default=32)
     args = ap.parse_args()
@@ -80,12 +68,13 @@ def main():
     # ---- checks on the inputs
     if sha256_of(DEFAULT_CHECKPOINT) != FINAL_CHECKPOINT_SHA256:
         raise SystemExit("ERROR: checkpoints/swin_t_ft_aug_best.pt is not the final model")
-    if sha256_of(args.neysan_zip) != NEYSAN_ZIP_SHA256:
-        raise SystemExit("ERROR: neysan_images.zip is damaged or a different file")
-    data = Path(args.data)
-    train, val = folder_images(data / "train"), folder_images(data / "val")
-    zf = zipfile.ZipFile(args.neysan_zip)
-    ny = list(csv.DictReader(io.TextIOWrapper(zf.open("neysan/neysan_manifest.csv"), encoding="utf-8")))
+    if sha256_of(NEYSAN_MANIFEST) != NEYSAN_MANIFEST_SHA256:
+        raise SystemExit("ERROR: decisions/neysan_eval.csv was changed")
+    roots = load_source_roots(DEFAULT_CONFIG)
+    train = [(resolve_image_path(r["image_path"], roots), r["label"]) for r in read_split_rows(DEFAULT_MANIFEST, "train")]
+    val = [(resolve_image_path(r["image_path"], roots), r["label"]) for r in read_split_rows(DEFAULT_MANIFEST, "val")]
+    with open(NEYSAN_MANIFEST, encoding="utf-8-sig", newline="") as f:
+        ny = list(csv.DictReader(f))
     if (len(train), len(val), len(ny)) != (2633, 659, 621):
         raise SystemExit(f"ERROR: expected 2633 / 659 / 621 images, found {len(train)} / {len(val)} / {len(ny)}")
 
@@ -112,7 +101,7 @@ def main():
     t0 = time.time()
     Ftr, _ = embed([lambda p=p: Image.open(p) for p, _ in train], "train")
     Fva, Pva = embed([lambda p=p: Image.open(p) for p, _ in val], "val")
-    Fny, _ = embed([lambda r=r: Image.open(io.BytesIO(zf.read(r["zip_path"]))) for r in ny], "neysan")
+    Fny, _ = embed([lambda r=r: Image.open(resolve_image_path(r["image_path"], roots)) for r in ny], "neysan")
     print(f"features done in {time.time() - t0:.0f} s")
 
     # ---- 2. pipeline check

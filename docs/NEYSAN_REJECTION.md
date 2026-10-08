@@ -26,14 +26,13 @@ Neysan images. To follow the mentors' rule without retraining, the runner report
 
 ## How it was built
 
-Script: `scripts/build_neysan_detector.py`. The accepted file was made once in Colab on a GPU, by a
-notebook with the same steps (kept in the Git history, commit `78da5aa`). The acceptance rules were
-written down before that run.
+Script: `scripts/build_neysan_detector.py`. The accepted file was made once on a GPU, with the same
+steps. The acceptance rules were written down before that run.
 
 Re-run on a computer:
 
 ```bash
-python scripts/build_neysan_detector.py --data <clean_dataset folder> --neysan-zip <neysan_images.zip>
+python scripts/build_neysan_detector.py
 ```
 
 - **Output file:** the re-run writes `checkpoints/neysan_detector_rerun.json`. The accepted
@@ -51,7 +50,7 @@ Training data and model:
 - **Pipeline check first:** the frozen model reproduced its recorded validation result, 640 / 659.
 - **Data not used:** the historical 400-image Test set was not used.
 
-## Results (from the Colab run)
+## Results (from that run)
 
 | Check | Result | Acceptance rule |
 |---|---|---|

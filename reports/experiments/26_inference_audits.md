@@ -35,8 +35,8 @@ split was changed, and the Test and Neysan sets were not used.
   - accuracy 0.972686 (641 / 659, one image more than single view);
   - macro F1 0.967132;
   - `kamyun` / `kamyunet` accuracy 183 / 191 = 0.958115.
-- **Note on the numbers:** they are as reported by the user; the console output of the script was not
-  saved.
+- **Note on the numbers:** the console output of the script was not saved; the numbers were recorded
+  by hand at the time.
 - **Decision:** not adopted; inference stays single-view. Full flip is kept only as an optional candidate.
   - The gain is one validation image.
   - The mode was chosen among six on the same validation set that had already been used for the
