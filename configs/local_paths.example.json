@@ -1,6 +1,6 @@
 {
   "sources": {
-    "v1": "PATH/TO/dataset",
-    "v2": "PATH/TO/datasetv2_TrainUclean"
+    "v1": "data/raw/dataset",
+    "v2": "data/raw/datasetv2_TrainUclean"
   }
 }

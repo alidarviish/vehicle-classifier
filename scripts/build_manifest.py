@@ -17,6 +17,7 @@ from pathlib import Path
 from PIL import Image
 
 IMAGE_EXTENSIONS = {".jpg", ".jpeg", ".png", ".webp", ".bmp"}
+REPO_ROOT = Path(__file__).resolve().parent.parent
 
 COLUMNS = [
     "image_path",      # portable path: <source>/<split>/<label>/<file name>
@@ -38,6 +39,8 @@ def load_source_roots(config_path):
     roots = {}
     for source_name, folder in config["sources"].items():
         root = Path(folder)
+        if not root.is_absolute():   # a relative path is relative to the repository root
+            root = REPO_ROOT / root
         if not root.is_dir():
             raise FileNotFoundError(f"source '{source_name}' folder not found: {root}")
         roots[source_name] = root

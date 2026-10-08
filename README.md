@@ -39,11 +39,13 @@ hashes are recorded (`decisions/`, reports).
 pip install -r requirements.txt
 ```
 
-Copy `configs/local_paths.example.json` to `configs/local_paths.json` and set the two local
-dataset folders. `local_paths.json` is ignored by Git.
+Put the two raw datasets in `data/raw/` (`data/` is ignored by Git, so no image is committed), then
+copy `configs/local_paths.example.json` to `configs/local_paths.json`. `local_paths.json` is also
+ignored by Git. A relative path is read from the repository root, so the project works wherever its
+folder is.
 
 ```json
-{"sources": {"v1": "PATH/TO/dataset", "v2": "PATH/TO/datasetv2_TrainUclean"}}
+{"sources": {"v1": "data/raw/dataset", "v2": "data/raw/datasetv2_TrainUclean"}}
 ```
 
 Image paths in all CSV files start with the source name (`v1/...`, `v2/...`). The paths in
