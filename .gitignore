@@ -46,6 +46,10 @@ checkpoints/
 models/
 runs/
 outputs/
+# result folders written by run_test.py (they list test image names)
+results/
+# local audit archive (contains machine-specific paths; kept on this computer only)
+archive/
 wandb/
 mlruns/
 lightning_logs/

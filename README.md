@@ -67,6 +67,7 @@ The data scripts only read the raw images.
 | Neysan evaluation (done once, historical `resnet224_ft_aug`) | `python scripts/evaluate_neysan.py` |
 | Neysan evaluation (done once, final model `swin_t_ft_aug`) | `python scripts/evaluate_neysan_swin.py --visibility-tags <tags.csv> --val-baseline <val_predictions.csv>` |
 | Prediction (JSON) | `python -m src.predict path/to/image.jpg [more images]` |
+| Test the final model on a folder of new images (mentor test) | `python run_test.py --input <folder>`, see [docs/MENTOR_TEST_GUIDE.md](docs/MENTOR_TEST_GUIDE.md) |
 
 Notes on the commands:
 
@@ -146,6 +147,26 @@ Selected after the project was reopened; see
 - **Three separate questions:** 8-class classification (is the image predicted `vanet`?), human
   review (is it flagged `needs_review`?) and subtype identification (is it recognised as Neysan?).
   The model can only be assessed on the first two; it has no output for the third.
+
+### Neysan -> `unknown` in the test runner (added 2026-10-08)
+
+The mentors' test rule is that a Neysan must not be accepted as a `vanet`. The 8-class model is
+unchanged; `run_test.py` adds one step on top of it:
+
+- **Detector:** a logistic regression on the 768-number feature vector of the frozen model
+  (`checkpoints/neysan_detector.json`, not in Git, delivered with the model file).
+- **Training data:** the 2633 training images and 259 of the 371 confirmed Neysan images. The 8-class
+  model was not retrained, and no image of the frozen Test set was used.
+- **Rule:** if p(Neysan) >= 0.5 (fixed in advance, not tuned), the output is `unknown` instead of one
+  of the 8 classes.
+- **Results:**
+  - 55 of 56 held-out confirmed Neysan images rejected;
+  - on validation, 1 of 659 ordinary images rejected (one `vanet`), so 639 / 659 correct
+    (640 without the detector).
+- **Details:** [docs/NEYSAN_REJECTION.md](docs/NEYSAN_REJECTION.md), built with
+  `colab/neysan_detector_colab.ipynb`.
+
+The sections below describe the earlier 8-class evaluation and are unchanged.
 
 ### Final model `swin_t_ft_aug` (threshold 0.95)
 
