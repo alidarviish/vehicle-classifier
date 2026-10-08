@@ -11,8 +11,12 @@ hashes are recorded here and in `decisions/`.
   (`src/dataset.py`, `CLASSES`).
 - Neysan is not a ninth class. It is a subtype of `vanet` (model label `vanet`, subtype `neysan`),
   confirmed by the professor (`decisions/REVIEW_PROTOCOL.md`).
-- Neysan images are never used for training, validation or Test. They form a separate
-  evaluation set, `neysan_eval`, used only after the model is frozen.
+  Since 2026-10-08, the test runner also reports an image as `unknown` when a separate Neysan
+  detector recognises it; the 8-class model and these data decisions are unchanged
+  ([NEYSAN_REJECTION.md](NEYSAN_REJECTION.md)).
+- Neysan images are never used for training the 8-class model, validation or Test. They form a
+  separate evaluation set, `neysan_eval`, used only after the model is frozen (and, after that, to
+  train the separate Neysan detector).
 - A017 (`v1/train/vanet/214726285.jpg`, a modern Nissan / Navara-style pickup) is `vanet`,
   subtype other, `NOT_NEYSAN` (`decisions/neysan_review.csv`, `decisions/REVIEW_PROTOCOL.md`).
 
@@ -153,8 +157,8 @@ Train + validation = 3292 images.
 - Labelled sample figure (data audit): 16 dataset images, 2 per class for all 8 classes, each
   shown with its class label. The images are the first two of each class from `v1/train` in
   `data/manifest.csv`. Because the dataset is private, the figure is kept outside the repository and
-  is not committed to Git (it must not be). It can be reproduced with
-  `scripts/make_labelled_sample_figure.py`.
+  is not committed to Git (it must not be). It was made with
+  `scripts/make_labelled_sample_figure.py` (removed on 2026-10-09; in the Git history, commit `78da5aa`).
 
 ## Known reproducibility gaps
 

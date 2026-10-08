@@ -28,6 +28,10 @@ hashes are recorded (`decisions/`, reports).
    protocol deviation, so that result is not a pristine held-out estimate.
 7. **Neysan evaluation.** A separate, inference-only analysis of 621 Neysan images (an unseen subtype
    of `vanet`, not a class), run once for `resnet224_ft_aug` and once for `swin_t_ft_aug`.
+8. **Test runner and Neysan rejection.** `run_test.py` tests the final model on any folder of new
+   images (the mentors' test). A small Neysan detector on the model's features reports a Neysan as
+   `unknown` instead of `vanet`; the 8-class model is unchanged
+   ([details](docs/NEYSAN_REJECTION.md), [guide](docs/MENTOR_TEST_GUIDE.md)).
 
 ## Setup
 
@@ -56,18 +60,16 @@ The data scripts only read the raw images.
 | Statuses (inspection) | `python scripts/build_statuses.py --overrides decisions/old_label_overrides.csv --out <file.csv>` |
 | Train/validation split | `python scripts/make_split.py --overrides decisions/old_label_overrides.csv --out data/split_manifest.csv` |
 | Rebuild the Test list (check only) | `python scripts/build_test.py --overrides decisions/old_label_overrides.csv --out <file.csv>` |
-| Imbalanced train subset (balanced-batches experiment) | `python scripts/make_imbalanced_train.py` |
 | Training (baseline) | `python -m src.train` |
 | Training (final model) | `python -m src.train --run-name swin_t_ft_aug --model swin_tiny --swin-mode fine_tuning --augmentation full_aug` |
 | Training (previous final model, historical) | `python -m src.train --run-name resnet224_ft_aug --model resnet18 --resnet-mode fine_tuning --augmentation full_aug` |
-| Validation analysis of a run | `python scripts/analyze_baseline.py --run-name <run_name>` |
-| ResNet setup checks (no data) | `python scripts/verify_resnet.py` |
 | Test evaluation (done once, historical `resnet224_ft_aug`) | `python scripts/evaluate_test.py` |
 | Test evaluation (done once, final model `swin_t_ft_aug`; second use of the frozen Test set) | `python scripts/evaluate_test_swin.py` |
 | Neysan evaluation (done once, historical `resnet224_ft_aug`) | `python scripts/evaluate_neysan.py` |
 | Neysan evaluation (done once, final model `swin_t_ft_aug`) | `python scripts/evaluate_neysan_swin.py --visibility-tags <tags.csv> --val-baseline <val_predictions.csv>` |
 | Prediction (JSON) | `python -m src.predict path/to/image.jpg [more images]` |
 | Test the final model on a folder of new images (mentor test) | `python run_test.py --input <folder>`, see [docs/MENTOR_TEST_GUIDE.md](docs/MENTOR_TEST_GUIDE.md) |
+| Build the Neysan detector (re-run; writes a new file) | `python scripts/build_neysan_detector.py --data <clean_dataset folder> --neysan-zip <neysan_images.zip>` |
 
 Notes on the commands:
 
@@ -77,7 +79,12 @@ Notes on the commands:
 - **Experiment commands.** The command for every experiment is in its report in
   `reports/experiments/`.
 - **Generated files kept out of Git.** Training writes `checkpoints/<run_name>_best.pt` and
-  `reports/<run_name>_history.csv`; the validation analysis writes `reports/analysis/<run_name>/`.
+  `reports/<run_name>_history.csv`; the validation analyses wrote `reports/analysis/<run_name>/`.
+- **Removed experiment scripts.** Scripts used only for finished experiments were removed on
+  2026-10-09: `analyze_baseline.py`, `val_error_audit.py`, `make_imbalanced_train.py`,
+  `verify_resnet.py`, `review_baseline_errors.py`, `make_contact_sheets.py` and
+  `make_labelled_sample_figure.py`. Their results stay in `reports/`. The code is in the Git
+  history (commit `78da5aa`).
 - **One-time scripts.** `evaluate_test.py` and `evaluate_neysan.py` refuse to run again once their
   outputs exist. Both are fixed to the previous final model `resnet224_ft_aug` (checkpoint SHA256
   and threshold 0.90) and are kept unchanged as historical scripts; they do not evaluate
@@ -105,6 +112,8 @@ Selected after the project was reopened; see
   ([report](reports/experiments/23_swin_needs_review_threshold.md)) and is defined in
   `src/predict.py`. It is only a flag for human review; no prediction is rejected. The threshold is
   not stored in the frozen checkpoint.
+- **Neysan -> `unknown`:** in `run_test.py` only, an image the Neysan detector recognises
+  (p(Neysan) >= 0.5) is reported as `unknown`. See [Neysan](#neysan---unknown-in-the-test-runner-added-2026-10-08).
 - **Final Test:** run once for this model, after it was selected on validation only
   ([report](reports/experiments/24_swin_final_test_evaluation.md)): accuracy 0.9550, macro F1 0.9545
   (382 / 400). This is the second use of the frozen Test set, a documented protocol deviation; the
@@ -164,7 +173,7 @@ unchanged; `run_test.py` adds one step on top of it:
   - on validation, 1 of 659 ordinary images rejected (one `vanet`), so 639 / 659 correct
     (640 without the detector).
 - **Details:** [docs/NEYSAN_REJECTION.md](docs/NEYSAN_REJECTION.md), built with
-  `colab/neysan_detector_colab.ipynb`.
+  `scripts/build_neysan_detector.py`.
 
 The sections below describe the earlier 8-class evaluation and are unchanged.
 
@@ -239,6 +248,8 @@ Run after the original final model was fixed. The EfficientNet-B0 comparison did
 - [Neysan / unclean analysis (ResNet, historical)](reports/experiments/13_neysan_unclean_analysis.md)
 - [Neysan evaluation (Swin-Tiny, final model)](reports/experiments/25_swin_neysan_evaluation.md)
 - [Dataset decisions](docs/DATA_DECISIONS.md)
+- [Neysan -> `unknown` (Neysan detector)](docs/NEYSAN_REJECTION.md)
+- [Mentor test guide (`run_test.py`)](docs/MENTOR_TEST_GUIDE.md)
 
 ## Reproducibility
 
@@ -253,7 +264,8 @@ Run after the original final model was fixed. The EfficientNet-B0 comparison did
   records the SHA256 of the ResNet checkpoint, `test_frozen.csv`, `split_manifest.csv` and
   `neysan_eval.csv`, before and after inference. The Swin reports 24 and 25 record the checkpoint and
   manifest SHA256 and check that they are unchanged after inference.
-- **Not in Git:** raw images, checkpoints, histories, analysis output and local paths.
+- **Not in Git:** raw images, checkpoints (including `neysan_detector.json`), histories, analysis
+  output and local paths.
 
 ## Limitations
 
@@ -273,3 +285,6 @@ Run after the original final model was fixed. The EfficientNet-B0 comparison did
   Test set is a documented protocol deviation, so the Swin result is not a pristine held-out
   estimate; it was not used for model or threshold selection. Each result is a single estimate
   without a confidence interval.
+- **Neysan detector.** It was trained on 259 confirmed Neysan images and checked on only 56 held-out
+  ones (55 rejected). On validation, 1 of 659 ordinary images was rejected by mistake. Its rejection
+  rate was not measured separately for night or infrared images.

@@ -12,6 +12,11 @@ protocol deviation, so that result is not a pristine held-out estimate (see
 inference only, for each final model (see [Neysan evaluation](#neysan-evaluation)); it was not used
 for any decision.
 
+Some reports name analysis scripts that were removed on 2026-10-09 because their experiments are
+finished: `analyze_baseline.py`, `val_error_audit.py`, `make_imbalanced_train.py`, `verify_resnet.py`,
+`review_baseline_errors.py`, `make_contact_sheets.py` and `make_labelled_sample_figure.py`. The reports
+are unchanged. The code is in the Git history (commit `78da5aa`).
+
 | Experiment | Run | Best epoch | Val accuracy | Macro precision | Macro recall | Macro F1 | Note |
 |---|---|---|---|---|---|---|---|
 | [Baseline](experiments/00_baseline.md) | `baseline` | 18 | 0.8801 | 0.8646 | 0.8509 | 0.8561 | Reference run; metrics recalculated with the current validation labels |

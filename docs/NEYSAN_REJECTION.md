@@ -26,8 +26,23 @@ Neysan images. To follow the mentors' rule without retraining, the runner report
 
 ## How it was built
 
-Notebook: `colab/neysan_detector_colab.ipynb`. It was run once in Colab on a GPU, with the
-acceptance rules written down before the run.
+Script: `scripts/build_neysan_detector.py`. The accepted file was made once in Colab on a GPU, by a
+notebook with the same steps (kept in the Git history, commit `78da5aa`). The acceptance rules were
+written down before that run.
+
+Re-run on a computer:
+
+```bash
+python scripts/build_neysan_detector.py --data <clean_dataset folder> --neysan-zip <neysan_images.zip>
+```
+
+- **Output file:** the re-run writes `checkpoints/neysan_detector_rerun.json`. The accepted
+  `neysan_detector.json` is never overwritten. CPU and GPU can differ in the last decimals, so a
+  re-run gets a different SHA256.
+- **Comparison:** at the end, the script reports on how many images the re-run makes the same
+  decision as the accepted detector.
+
+Training data and model:
 
 - **Negatives:** the 2633 training-split images (all 8 classes).
 - **Positives:** confirmed Neysan images from `decisions/neysan_eval.csv` (`basis = CONFIRMED_NEYSAN`),
