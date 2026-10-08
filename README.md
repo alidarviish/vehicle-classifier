@@ -247,6 +247,7 @@ Run after the original final model was fixed. The EfficientNet-B0 comparison did
 - [Final Test evaluation (Swin-Tiny, final model; second use of the frozen Test set)](reports/experiments/24_swin_final_test_evaluation.md)
 - [Neysan / unclean analysis (ResNet, historical)](reports/experiments/13_neysan_unclean_analysis.md)
 - [Neysan evaluation (Swin-Tiny, final model)](reports/experiments/25_swin_neysan_evaluation.md)
+- [Inference-time and kamyun / kamyunet boundary audits (diagnostic only)](reports/experiments/26_inference_audits.md)
 - [Dataset decisions](docs/DATA_DECISIONS.md)
 - [Neysan -> `unknown` (Neysan detector)](docs/NEYSAN_REJECTION.md)
 - [Mentor test guide (`run_test.py`)](docs/MENTOR_TEST_GUIDE.md)

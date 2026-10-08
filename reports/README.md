@@ -155,6 +155,7 @@ Reports of the reopened final-model phase:
 - [23_swin_needs_review_threshold.md](experiments/23_swin_needs_review_threshold.md): Swin `needs_review` threshold selection
 - [24_swin_final_test_evaluation.md](experiments/24_swin_final_test_evaluation.md): Swin final Test evaluation (second use of the frozen Test set)
 - [25_swin_neysan_evaluation.md](experiments/25_swin_neysan_evaluation.md): Swin Neysan evaluation
+- [26_inference_audits.md](experiments/26_inference_audits.md): test-time augmentation, occlusion and kamyun / kamyunet boundary audits (diagnostic only)
 
 ### Original selection: `resnet224_ft_aug` (historical)
 
