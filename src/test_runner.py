@@ -34,12 +34,15 @@ from src.dataset import CLASSES  # noqa: E402  the 8 classes, in the model's ind
 
 # ------------------------------------------------------------------------------------------- settings
 
-DEFAULT_CHECKPOINT = REPO_ROOT / "checkpoints" / "swin_t_ft_aug_best.pt"
-FINAL_CHECKPOINT_SHA256 = "f03bacde0a155461ea4aede0b813b8688d6ed17973d5ad19b0d2c1b913ff64db"
+# final model: Swin-Tiny v3 (src/train_v3.py, run v3_final)
+# previous final model: swin_t_ft_aug_best.pt, sha256 f03bacde0a155461ea4aede0b813b8688d6ed17973d5ad19b0d2c1b913ff64db
+DEFAULT_CHECKPOINT = REPO_ROOT / "checkpoints" / "v3_final_best.pt"
+FINAL_CHECKPOINT_SHA256 = "bb8b159a2b1c42ab92cd1b1c33020ac32550baebe5200a20071525e3279d3848"
 
-# Neysan detector (docs/NEYSAN_REJECTION.md): built by scripts/build_neysan_detector.py
-DEFAULT_DETECTOR = REPO_ROOT / "checkpoints" / "neysan_detector.json"
-DETECTOR_SHA256 = "1f4106cbcef2c9ad3d7b5b64e017ede1f4ce03ecbdc3fb9527af0a26a845e3c7"
+# Neysan detector: built by scripts/build_neysan_detector_v3.py for the model above
+# previous detector: neysan_detector.json, sha256 1f4106cbcef2c9ad3d7b5b64e017ede1f4ce03ecbdc3fb9527af0a26a845e3c7
+DEFAULT_DETECTOR = REPO_ROOT / "checkpoints" / "neysan_detector_v3.json"
+DETECTOR_SHA256 = "69bc046a9c4655d8790e128afa60e8446c255a922523833a5cf03c1d3f57cf33"
 
 UNKNOWN = "unknown"                    # output for an image the Neysan detector rejects
 COLUMNS = CLASSES + [UNKNOWN]          # columns of the confusion matrix (predicted values)
@@ -130,14 +133,14 @@ class FinalModelPredictor:
 class NeysanDetector:
     """Logistic regression: p(Neysan) = sigmoid(sum(((feature - mean) / scale) * coef) + intercept)."""
 
-    def __init__(self, path, allow_other=False):
+    def __init__(self, path, allow_other=False, checkpoint_sha=FINAL_CHECKPOINT_SHA256):
         raw = Path(path).read_bytes()
         self.sha256 = hashlib.sha256(raw).hexdigest()
         if self.sha256 != DETECTOR_SHA256 and not allow_other:
             raise SystemExit(f"ERROR: Neysan detector SHA256 {self.sha256} is not the accepted file ({DETECTOR_SHA256}).")
         d = json.loads(raw.decode("utf-8"))
-        if d.get("checkpoint_sha256") != FINAL_CHECKPOINT_SHA256:
-            raise SystemExit("ERROR: the Neysan detector was not built for the final checkpoint.")
+        if d.get("checkpoint_sha256") != checkpoint_sha:   # a detector only fits the model it was built for
+            raise SystemExit("ERROR: the Neysan detector was not built for this model checkpoint.")
         self.mean, self.scale, self.coef = d["mean"], d["scale"], d["coef"]
         self.intercept, self.threshold = float(d["intercept"]), float(d["threshold"])
         if not len(self.mean) == len(self.scale) == len(self.coef) == d["feature_dim"]:
@@ -267,7 +270,8 @@ def summary_text(info, counts, overall, per_group):
 
 def run(input_dir, output_dir, checkpoint=DEFAULT_CHECKPOINT, batch_size=32, device="auto",
         overwrite=False, allow_other_checkpoint=False, predictor=None,
-        neysan_detector=DEFAULT_DETECTOR, use_neysan_detector=True, allow_other_detector=False):
+        neysan_detector=DEFAULT_DETECTOR, use_neysan_detector=True, allow_other_detector=False,
+        review_threshold=None, report_images=True):
     start = time.time()
     input_dir, output_dir = Path(input_dir).expanduser(), Path(output_dir).expanduser()
 
@@ -285,21 +289,23 @@ def run(input_dir, output_dir, checkpoint=DEFAULT_CHECKPOINT, batch_size=32, dev
     if predictor is None:
         checkpoint = Path(checkpoint).expanduser()
         if not checkpoint.is_file():
-            raise SystemExit(f"ERROR: checkpoint not found: {checkpoint}\n       pass swin_t_ft_aug_best.pt with --checkpoint")
+            raise SystemExit(f"ERROR: checkpoint not found: {checkpoint}\n       pass the model file with --checkpoint")
         ckpt_sha = sha256_of(checkpoint)
         if ckpt_sha != FINAL_CHECKPOINT_SHA256 and not allow_other_checkpoint:
             raise SystemExit(f"ERROR: checkpoint SHA256 {ckpt_sha} is not the final model ({FINAL_CHECKPOINT_SHA256}).")
         predictor = FinalModelPredictor(checkpoint, device)
     else:
         ckpt_sha = getattr(predictor, "sha256", "test-predictor")
-    from src.predict import NEEDS_REVIEW_THRESHOLD, needs_review   # the one place the 0.95 rule is defined
+    from src.predict import NEEDS_REVIEW_THRESHOLD, needs_review   # the one place the default threshold is defined
+    if review_threshold is not None:   # only to re-run an earlier model with its own threshold
+        NEEDS_REVIEW_THRESHOLD = float(review_threshold)
 
     # ---- 2. load the Neysan detector
     detector, det_info = None, {"enabled": False, "reason": "--no-neysan-detector"}
     if use_neysan_detector:
         det_path = Path(neysan_detector).expanduser()
         if det_path.is_file():
-            detector = NeysanDetector(det_path, allow_other_detector)
+            detector = NeysanDetector(det_path, allow_other_detector, ckpt_sha)
             det_info = {"enabled": True, "sha256": detector.sha256, "threshold": detector.threshold}
         elif Path(neysan_detector) == DEFAULT_DETECTOR:
             print(f"WARNING: Neysan detector not found ({det_path}); plain 8-class output", flush=True)
@@ -393,6 +399,9 @@ def run(input_dir, output_dir, checkpoint=DEFAULT_CHECKPOINT, batch_size=32, dev
     write_csv(output_dir / "skipped_files.csv", skipped, ["image_path", "reason"])
     if overall:
         save_confusion_matrix(overall, output_dir)
+    if labeled and report_images:   # per-test folders with pictures of errors, needs_review and unknown
+        from src.test_report import save_group_reports
+        save_group_reports(labeled, groups, input_dir, output_dir, compute_metrics, save_confusion_matrix, write_csv, fields)
 
     counts = {"images": len(images), "labeled": len(labeled), "unlabeled": len(rows) - len(labeled),
               "failed": len(failed), "skipped": len(skipped),

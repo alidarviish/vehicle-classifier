@@ -29,11 +29,12 @@ from src.swin import build_swin_tiny
 from src.train import resnet_transform
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
-FINAL_CHECKPOINT = REPO_ROOT / "checkpoints" / "swin_t_ft_aug_best.pt"
+FINAL_CHECKPOINT = REPO_ROOT / "checkpoints" / "v3_final_best.pt"   # previous final model: swin_t_ft_aug_best.pt
 
-# Chosen on validation only, see reports/experiments/23_swin_needs_review_threshold.md.
+# Chosen on validation only with the fixed rule "lowest of 0.70/0.80/0.90/0.95 that flags at least half of the
+# validation errors" (scripts/build_neysan_detector_v3.py). Previous model: 0.95.
 # This is the single place where the threshold is defined.
-NEEDS_REVIEW_THRESHOLD = 0.95
+NEEDS_REVIEW_THRESHOLD = 0.90
 
 
 def needs_review(confidence, threshold=NEEDS_REVIEW_THRESHOLD):

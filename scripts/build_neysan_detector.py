@@ -39,8 +39,12 @@ sys.path.insert(0, str(REPO_ROOT))
 
 from src.dataset import (CLASSES, DEFAULT_CONFIG, DEFAULT_MANIFEST, load_source_roots,  # noqa: E402
                          read_split_rows, resolve_image_path)
-from src.test_runner import (DEFAULT_CHECKPOINT, DEFAULT_DETECTOR, FINAL_CHECKPOINT_SHA256,  # noqa: E402
-                             NeysanDetector, sha256_of)
+from src.test_runner import NeysanDetector, sha256_of  # noqa: E402
+
+# this script belongs to the previous model (swin_t_ft_aug); the v3 model uses build_neysan_detector_v3.py
+DEFAULT_CHECKPOINT = REPO_ROOT / "checkpoints" / "swin_t_ft_aug_best.pt"
+FINAL_CHECKPOINT_SHA256 = "f03bacde0a155461ea4aede0b813b8688d6ed17973d5ad19b0d2c1b913ff64db"
+DEFAULT_DETECTOR = REPO_ROOT / "checkpoints" / "neysan_detector.json"
 
 NEYSAN_MANIFEST = REPO_ROOT / "decisions" / "neysan_eval.csv"
 NEYSAN_MANIFEST_SHA256 = "1e8cad9bbca206740f78dda72da6318c8851d6f56ec17281317048308576086a"
@@ -161,7 +165,7 @@ def main():
 
     # ---- compare with the accepted detector (same decision for how many images?)
     if DEFAULT_DETECTOR.is_file():
-        accepted = NeysanDetector(DEFAULT_DETECTOR)
+        accepted = NeysanDetector(DEFAULT_DETECTOR, allow_other=True, checkpoint_sha=FINAL_CHECKPOINT_SHA256)
         F_all = np.concatenate([Fva, Fny])
         old = np.array([accepted.score(f) >= accepted.threshold for f in F_all.tolist()])
         new = rejected(F_all)

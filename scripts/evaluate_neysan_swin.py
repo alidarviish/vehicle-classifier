@@ -313,10 +313,8 @@ def main(argv=None):
     if sha_before["checkpoint"] != CHECKPOINT_SHA256:
         sys.exit(f"checkpoint SHA256 mismatch: {sha_before['checkpoint']} (expected {CHECKPOINT_SHA256})")
     import src.predict as P
-    if Path(P.FINAL_CHECKPOINT).resolve() != CHECKPOINT.resolve():
-        sys.exit(f"src/predict.py FINAL_CHECKPOINT is {P.FINAL_CHECKPOINT}, expected {CHECKPOINT}")
-    if P.NEEDS_REVIEW_THRESHOLD != EXPECTED_THRESHOLD:
-        sys.exit(f"needs_review threshold is {P.NEEDS_REVIEW_THRESHOLD}, expected {EXPECTED_THRESHOLD}")
+    # historical evaluation of swin_t_ft_aug: CHECKPOINT and EXPECTED_THRESHOLD above are fixed here,
+    # independent of the current final model in src/predict.py
     if list(P.CLASSES) != CLASSES:
         sys.exit(f"class order differs: {P.CLASSES}")
     head, dirty, status_before = git_snapshot()
@@ -341,7 +339,7 @@ def main(argv=None):
     hook.remove()
 
     rows = build_rows(manifest, predictions, full_probs, vis)
-    checks = integrity_checks(manifest, rows, predictions, P.NEEDS_REVIEW_THRESHOLD)
+    checks = integrity_checks(manifest, rows, predictions, EXPECTED_THRESHOLD)
     checks["visibility group present for all 337 confirmed-not-v1/test rows"] = \
         sum(bool(r["visibility_group"]) for r in rows) == 337
     sha_after = {k: sha256_of(p) for k, p in guarded.items()}
@@ -351,7 +349,7 @@ def main(argv=None):
             "checkpoint": CHECKPOINT.relative_to(REPO_ROOT).as_posix(), "checkpoint_sha256": sha_before["checkpoint"],
             "architecture": checkpoint["architecture"], "epoch": checkpoint["epoch"],
             "transform": " -> ".join(repr(t) for t in eval_transform.transforms).replace("\n", " "),
-            "threshold": P.NEEDS_REVIEW_THRESHOLD, "neysan_sha256": sha_before["neysan_eval.csv"],
+            "threshold": EXPECTED_THRESHOLD, "neysan_sha256": sha_before["neysan_eval.csv"],
             "vis_name": args.visibility_tags.name, "vis_sha256": sha256_of(args.visibility_tags),
             "val_name": args.val_baseline.name, "val_sha256": sha256_of(args.val_baseline)}
     write_csv(rows, OUT_CSV)

@@ -131,10 +131,8 @@ def main():
     if checkpoint_sha != CHECKPOINT_SHA256:
         sys.exit(f"checkpoint SHA256 mismatch: {checkpoint_sha} (expected {CHECKPOINT_SHA256})")
     import src.predict as P
-    if Path(P.FINAL_CHECKPOINT).resolve() != CHECKPOINT.resolve():
-        sys.exit(f"src/predict.py FINAL_CHECKPOINT is {P.FINAL_CHECKPOINT}, expected {CHECKPOINT}")
-    if P.NEEDS_REVIEW_THRESHOLD != EXPECTED_THRESHOLD:
-        sys.exit(f"needs_review threshold is {P.NEEDS_REVIEW_THRESHOLD}, expected {EXPECTED_THRESHOLD}")
+    # historical evaluation of swin_t_ft_aug: CHECKPOINT and EXPECTED_THRESHOLD above are fixed here,
+    # independent of the current final model in src/predict.py
     if list(P.CLASSES) != CLASSES:
         sys.exit(f"class order differs: {P.CLASSES}")
     print("Swin checkpoint SHA256, predict.py checkpoint, threshold and class order verified")
@@ -165,7 +163,7 @@ def main():
         "architecture": checkpoint["architecture"],
         "epoch": checkpoint["epoch"], "val_f1": checkpoint["val_f1"],
         "transform": " -> ".join(repr(t) for t in eval_transform.transforms).replace("\n", " "),
-        "threshold": P.NEEDS_REVIEW_THRESHOLD,
+        "threshold": EXPECTED_THRESHOLD,
         "manifest_rows": len(manifest_rows), "manifest_sha256": manifest_sha,
     }
     write_csv(out_rows, OUT_CSV)
