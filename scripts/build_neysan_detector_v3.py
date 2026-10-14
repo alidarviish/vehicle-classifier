@@ -2,7 +2,7 @@
 
     python scripts/build_neysan_detector_v3.py
 
-Same method as scripts/build_neysan_detector.py (docs/NEYSAN_REJECTION.md), now for the v3 model
+Same method as scripts/archive/build_neysan_detector.py (docs/NEYSAN_REJECTION.md), now for the v3 model
 (checkpoints/v3_final_best.pt) and dataset v3 (data/dataset_v3). Nothing here trains the 8-class model,
 and the test folders are never read.
 

@@ -1,7 +1,7 @@
 """One-time, inference-only evaluation of the final model on the Neysan evaluation set.
 
 Run ONCE, from the repository root, only after approval:
-    python scripts/evaluate_neysan.py
+    python scripts/archive/evaluate_neysan.py
 
 Neysan is a subtype of vanet (docs/DATA_DECISIONS.md), not a ninth class. The model has 8 classes;
 every Neysan image is expected to be predicted as `vanet` (expected_model_label = vanet is the
@@ -34,12 +34,12 @@ from collections import Counter
 from datetime import datetime, timezone
 from pathlib import Path
 
-REPO_ROOT = Path(__file__).resolve().parent.parent
+REPO_ROOT = Path(__file__).resolve().parents[2]
 if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
 # shared helpers of the Test evaluation (no inference logic in them)
-from scripts.evaluate_test import (CHECKPOINT, CHECKPOINT_SHA256, CLASSES, EXPECTED_THRESHOLD,  # noqa: E402
+from scripts.archive.evaluate_test import (CHECKPOINT, CHECKPOINT_SHA256, CLASSES, EXPECTED_THRESHOLD,  # noqa: E402
                                    read_manifest, sha256_of, write_csv)
 
 NEYSAN_MANIFEST = REPO_ROOT / "decisions" / "neysan_eval.csv"
@@ -171,7 +171,7 @@ def render_report(info, out_rows, checks, threshold):
               ("Unique SHA256 images (620)", unique_by_sha(out_rows))]
     S = {name: summarize(rows) for name, rows in groups}
     L = ["# Neysan / unclean analysis (inference only)", "",
-         "Written by `scripts/evaluate_neysan.py`. Descriptive analysis of the final model on the separate",
+         "Written by `scripts/archive/evaluate_neysan.py`. Descriptive analysis of the final model on the separate",
          "Neysan evaluation set. It makes no decision about the model, the threshold, labels or Test.", "",
          "## Scope", "",
          "- Neysan is an unseen subtype of `vanet`, not a ninth class. The model has 8 classes and never saw",
@@ -259,7 +259,7 @@ def main():
             sys.exit(f"refusing to run: {p.relative_to(REPO_ROOT)} already exists (run only once)")
 
     # ---- checks, before any prediction ----
-    from scripts.build_statuses import load_statuses
+    from scripts.archive.build_statuses import load_statuses
     from src.dataset import DEFAULT_CONFIG, load_source_roots, resolve_image_path
     roots = load_source_roots(DEFAULT_CONFIG)
     rows = read_manifest(NEYSAN_MANIFEST)

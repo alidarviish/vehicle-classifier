@@ -1,5 +1,28 @@
 # Reports index
 
+## Current final model: `v3_final` (dataset v3)
+
+[Report 27](experiments/27_v3_dataset_and_final_model.md) covers dataset v3 (our data plus half of
+the mentors' test0), the `kamyun` / `kamyunet` relabeling, the six v3 training runs, the v3 Neysan
+detector and the final test. Histories of the v3 runs: [`v3/`](v3/).
+
+| Run | Val accuracy | Val macro F1 | Note |
+|---|---:|---:|---|
+| `v3_base` | 0.9603 | 0.9539 | dataset v3, old augmentation |
+| `v3_aug` | 0.9642 | 0.9606 | strong augmentation |
+| `v3_aug_top2` | 0.9775 | 0.9769 | + stages 4-7 unfrozen |
+| `v3_aug_top2_cos` | 0.9735 | 0.9738 | + cosine LR, 30 epochs |
+| `v3_aug_top2_rl` | 0.9854 | 0.9803 | labels after relabel round 1 |
+| **`v3_final`** | **0.9854** | **0.9850** | labels after relabel rounds 1+2; final model |
+
+Final test, mentors' test0 (479 held-out images): accuracy 0.9666, macro F1 0.9720
+(`swin_t_ft_aug`: 0.9478 / 0.9361). The v3 validation set (755 images) differs from the one below
+(659 images), so the two tables are not directly comparable.
+
+The one-time scripts named in reports 00-26 (`scripts/<name>.py`) are now in `scripts/archive/`.
+
+## Experiments before dataset v3
+
 Validation results of every experiment run documented in `experiments/` (split
 `data/split_manifest.csv`, train / validation = 2633 / 659 unless noted, seed 42; each run was trained once). Metrics are for
 the checkpoint with the highest validation macro F1. All metrics in this index are validation
@@ -51,7 +74,7 @@ are unchanged. The code is in the Git history (commit `78da5aa`).
 | [ConvNeXt-Tiny](experiments/19_convnext_tiny_ft_aug.md) | `convnext_t_ft_aug` | 11 | 0.9590 | 0.9559 | 0.9557 | 0.9557 | As `convnext_t_ft_none` + train-only `full_aug` |
 | [Swin-Tiny](experiments/20_swin_tiny_fe_none.md) | `swin_t_fe_none` | 19 | 0.9423 | 0.9447 | 0.9298 | 0.9363 | Pretrained Swin-Tiny, 224x224, backbone frozen, only the head trained |
 | [Swin-Tiny](experiments/21_swin_tiny_ft_none.md) | `swin_t_ft_none` | 13 | 0.9621 | 0.9565 | 0.9619 | 0.9582 | Head only in epochs 1-5, then `features[6:8]` + `norm` + head |
-| [Swin-Tiny](experiments/22_swin_tiny_ft_aug.md) | `swin_t_ft_aug` | 17 | 0.9712 | 0.9626 | 0.9698 | 0.9658 | As `swin_t_ft_none` + train-only `full_aug`; current final model (`decisions/REOPEN_FINAL_MODEL_SELECTION.md`) |
+| [Swin-Tiny](experiments/22_swin_tiny_ft_aug.md) | `swin_t_ft_aug` | 17 | 0.9712 | 0.9626 | 0.9698 | 0.9658 | As `swin_t_ft_none` + train-only `full_aug`; final model before v3 (`decisions/REOPEN_FINAL_MODEL_SELECTION.md`) |
 
 `effnet_b0_fe_none` has no report of its own; its accuracy (0.9363) and macro F1 (0.9261) are recorded
 in `17_convnext_tiny_fe_none.md`.
@@ -137,11 +160,11 @@ single run with seed 42 and is not general evidence about the effect of this com
 
 ## Final model selection
 
-### Current final model: `swin_t_ft_aug` (reopened selection)
+### Final model before v3: `swin_t_ft_aug` (reopened selection)
 
 The final model selection was reopened after the original project was closed
 ([decisions/REOPEN_FINAL_MODEL_SELECTION.md](../decisions/REOPEN_FINAL_MODEL_SELECTION.md)).
-**`swin_t_ft_aug`** was adopted as the current final model on validation evidence only, checkpoint
+**`swin_t_ft_aug`** was adopted as the final model on validation evidence only (later replaced by `v3_final`, report 27), checkpoint
 `checkpoints/swin_t_ft_aug_best.pt` (epoch 17). Its validation results are accuracy 0.9712, macro
 precision 0.9626, macro recall 0.9698 and macro F1 0.9658. No Test result was used for this selection.
 
@@ -174,7 +197,7 @@ The test set was not used to choose it.
 
 ## Final Test evaluation
 
-### Current final model `swin_t_ft_aug` (second use of the frozen Test set)
+### Final model before v3, `swin_t_ft_aug` (second use of the frozen Test set)
 
 [24_swin_final_test_evaluation.md](experiments/24_swin_final_test_evaluation.md) (per-image predictions:
 [24_swin_final_test_predictions.csv](experiments/24_swin_final_test_predictions.csv)). Status: completed,
@@ -247,5 +270,6 @@ descriptive only; no label, taxonomy, threshold or Test decision was made from t
 ## Other folders
 
 - `audit/`: initial dataset audit (counts and exact duplicates).
-- `analysis/`: generated analysis output (ignored by Git), one folder per analysed run:
+- `v3/`: per-epoch histories of the v3 runs (report 27).
+- `analysis/`: generated analysis output (ignored by Git, no longer kept), one folder per analysed run:
   `reports/analysis/<run_name>/`, including `reports/analysis/baseline/`.

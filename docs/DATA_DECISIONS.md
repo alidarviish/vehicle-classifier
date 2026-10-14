@@ -165,3 +165,20 @@ Train + validation = 3292 images.
 The inputs and lists that were missing are now in the repository:
 `decisions/old_label_overrides.csv`, `decisions/test_frozen.csv` (400 images) and
 `decisions/neysan_eval.csv` (621 images).
+
+## Dataset v3 (current)
+
+The rules above built the v1/v2 split (2633 train / 659 validation / 400 Test). The current final model
+is trained on dataset v3, which adds half of the mentors' test0 and moves our old Test into train. Two
+decisions were added for v3; details in
+[report 27](../reports/experiments/27_v3_dataset_and_final_model.md).
+
+- **Near duplicates across the test boundary.** Images with a pHash distance <= 5 stay on the same side,
+  and a mentor image that looks like one of our own images is never put in the test half.
+- **`kamyun` / `kamyunet` follow the mentor rule.** Light cab-over trucks (Isuzu, JAC, Hyundai, Foton)
+  are `kamyunet`; heavy trucks (Scania, Volvo FH, heavy or bonneted Mercedes-Benz, FAW, dump trucks,
+  tractor units) are `kamyun`. 59 train / validation images were relabeled in two rounds:
+  `decisions/v3_kamyun_relabel_round1.csv` (41) and `decisions/v3_kamyun_relabel_round2.csv` (18).
+  The test folders were not changed.
+- **Location.** `data/dataset_v3/{train,val,neysan,test}/` with `split_v3.csv` (not in Git). Image
+  paths in `data/split_manifest_v3.csv` start with `v3/`, resolved by `configs/local_paths.json`.

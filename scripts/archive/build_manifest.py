@@ -4,8 +4,8 @@ The script only READS the raw datasets. It never copies, moves, renames,
 deletes or changes any file there.
 
 Usage:
-    python scripts/build_manifest.py
-    python scripts/build_manifest.py --config configs/local_paths.json --out data/manifest.csv
+    python scripts/archive/build_manifest.py
+    python scripts/archive/build_manifest.py --config configs/local_paths.json --out data/manifest.csv
 """
 
 import argparse
@@ -17,7 +17,7 @@ from pathlib import Path
 from PIL import Image
 
 IMAGE_EXTENSIONS = {".jpg", ".jpeg", ".png", ".webp", ".bmp"}
-REPO_ROOT = Path(__file__).resolve().parent.parent
+REPO_ROOT = Path(__file__).resolve().parents[2]
 
 COLUMNS = [
     "image_path",      # portable path: <source>/<split>/<label>/<file name>

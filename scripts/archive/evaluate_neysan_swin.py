@@ -1,14 +1,14 @@
 """One-time, inference-only Neysan evaluation of the final Swin-Tiny model `swin_t_ft_aug`.
 
 Run ONCE, from the repository root, only after approval:
-    python scripts/evaluate_neysan_swin.py --visibility-tags <tags.csv> --val-baseline <val_predictions.csv>
+    python scripts/archive/evaluate_neysan_swin.py --visibility-tags <tags.csv> --val-baseline <val_predictions.csv>
 
 Neysan is a subtype of vanet (docs/DATA_DECISIONS.md), not a ninth class. The 8-class model cannot
 identify the subtype; every Neysan image is expected to be predicted as `vanet`. Nothing here trains,
 tunes the threshold or changes the model, labels, splits, Test or the historical ResNet outputs (13_*).
 
 Inputs:
-- decisions/neysan_eval.csv (621 rows), verified with the checks of scripts/evaluate_neysan.py.
+- decisions/neysan_eval.csv (621 rows), verified with the checks of scripts/archive/evaluate_neysan.py.
 - --visibility-tags: private Gate-1 annotation CSV (columns image_path, lighting, front_visibility),
   covering exactly the 337 confirmed Neysan images not from v1/test. Kept outside the repository;
   only its file name and SHA256 are recorded.
@@ -36,13 +36,13 @@ from collections import Counter
 from datetime import datetime, timezone
 from pathlib import Path
 
-REPO_ROOT = Path(__file__).resolve().parent.parent
+REPO_ROOT = Path(__file__).resolve().parents[2]
 if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
 # model-independent helpers of the historical evaluators (no checkpoint or threshold used from them)
-from scripts.evaluate_test import CLASSES, read_manifest, sha256_of, write_csv  # noqa: E402
-from scripts.evaluate_neysan import (ALLOWED_DUPLICATE_PAIR, NEYSAN_MANIFEST, NEYSAN_REVIEWS,  # noqa: E402
+from scripts.archive.evaluate_test import CLASSES, read_manifest, sha256_of, write_csv  # noqa: E402
+from scripts.archive.evaluate_neysan import (ALLOWED_DUPLICATE_PAIR, NEYSAN_MANIFEST, NEYSAN_REVIEWS,  # noqa: E402
                                      SPLIT_MANIFEST, TEST_MANIFEST, git_snapshot, quartiles,
                                      verify_neysan_manifest)
 
@@ -203,7 +203,7 @@ def render_report(info, rows, checks, val_rows, test_rows):
     th = info["threshold"]
     sub = {k: [r for r in rows if r["subgroup"] == k] for k, _, _ in SUBGROUPS}
     L = ["# Neysan evaluation: `swin_t_ft_aug` (inference only)", "",
-         "Written by `scripts/evaluate_neysan_swin.py`. Neysan is a subtype of `vanet`, not a ninth class;",
+         "Written by `scripts/archive/evaluate_neysan_swin.py`. Neysan is a subtype of `vanet`, not a ninth class;",
          "the expected 8-class output for every image is `vanet`. Nothing in this report was used to change",
          "the model, the threshold or the final Test result.", "",
          "## Run", "",
@@ -289,7 +289,7 @@ def main(argv=None):
             sys.exit(f"refusing to run: {p.relative_to(REPO_ROOT)} already exists (run only once)")
 
     # ---- checks, before any prediction ----
-    from scripts.build_statuses import load_statuses
+    from scripts.archive.build_statuses import load_statuses
     from src.dataset import DEFAULT_CONFIG, load_source_roots, resolve_image_path
     roots = load_source_roots(DEFAULT_CONFIG)
     manifest = read_manifest(NEYSAN_MANIFEST)

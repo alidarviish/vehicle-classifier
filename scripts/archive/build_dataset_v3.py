@@ -1,6 +1,6 @@
 """Build dataset v3: our data + half of the mentor test data, in one simple folder.
 
-    python scripts/build_dataset_v3.py
+    python scripts/archive/build_dataset_v3.py
 
 Inputs (read only, nothing is changed):
     data/split_manifest.csv + data/raw/...   our Train (2633) and Validation (659)
@@ -34,7 +34,7 @@ import numpy as np
 
 from PIL import Image
 
-REPO = Path(__file__).resolve().parents[1]
+REPO = Path(__file__).resolve().parents[2]
 DATA = REPO / "data"
 MENTOR = DATA / "mentor_test" / "TestingData"
 OUT = DATA / "dataset_v3"

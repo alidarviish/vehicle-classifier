@@ -14,7 +14,7 @@ Steps (same logic as the split currently in use):
 Only reads files. Writes a CSV only when --out is given.
 
 Usage:
-    python scripts/make_split.py --overrides decisions/old_label_overrides.csv --out <file.csv>
+    python scripts/archive/make_split.py --overrides decisions/old_label_overrides.csv --out <file.csv>
 """
 
 import argparse
@@ -23,13 +23,13 @@ import sys
 from collections import defaultdict
 from pathlib import Path
 
-REPO_ROOT = Path(__file__).resolve().parent.parent
+REPO_ROOT = Path(__file__).resolve().parents[2]
 if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
-from scripts.build_statuses import (DECISIONS_DIR, DEFAULT_MANIFEST, DEFAULT_OVERRIDES,  # noqa: E402
+from scripts.archive.build_statuses import (DECISIONS_DIR, DEFAULT_MANIFEST, DEFAULT_OVERRIDES,  # noqa: E402
                                     load_statuses, read_csv, write_csv)
-from scripts.build_test import APPROVED_REPLACEMENTS, CLASSES  # noqa: E402
+from scripts.archive.build_test import APPROVED_REPLACEMENTS, CLASSES  # noqa: E402
 
 SEED = 42
 VAL_FRACTION = 0.2

@@ -1,7 +1,7 @@
 """Final, one-time evaluation of the selected model on the frozen Test set.
 
 Run this ONCE, from the repository root, only after the protocol has been approved:
-    python scripts/evaluate_test.py
+    python scripts/archive/evaluate_test.py
 
 What it does, in this order:
 1. Refuses to start if the output files already exist (Test is evaluated only once).
@@ -27,7 +27,7 @@ from collections import Counter
 from datetime import datetime, timezone
 from pathlib import Path
 
-REPO_ROOT = Path(__file__).resolve().parent.parent
+REPO_ROOT = Path(__file__).resolve().parents[2]
 if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
@@ -172,7 +172,7 @@ def render_report(info, metrics, counts, checks, classes=CLASSES):
         "# Final Test evaluation",
         "",
         "One-time evaluation of the selected model on the frozen Test set, written by",
-        "`scripts/evaluate_test.py`.",
+        "`scripts/archive/evaluate_test.py`.",
         "",
         "## Run",
         "",

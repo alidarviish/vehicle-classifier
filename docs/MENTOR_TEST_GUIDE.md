@@ -8,12 +8,12 @@ the thresholds or the preprocessing.
 
 | Item | Value |
 |---|---|
-| Model | Swin-Tiny (torchvision `swin_t`, ImageNet weights), fine-tuned, epoch 17 |
-| Model file | `swin_t_ft_aug_best.pt` (about 105 MB), SHA256 `f03bacde0a155461ea4aede0b813b8688d6ed17973d5ad19b0d2c1b913ff64db` |
+| Model | Swin-Tiny (torchvision `swin_t`, ImageNet weights), fine-tuned on dataset v3 (run `v3_final`), epoch 19 |
+| Model file | `v3_final_best.pt` (about 105 MB), SHA256 `bb8b159a2b1c42ab92cd1b1c33020ac32550baebe5200a20071525e3279d3848` |
 | Classes | ambulance, autobus, kamyun, kamyunet, minibus, savari, taxi, vanet |
 | Preprocessing | whole image resized to 224x224 -> tensor -> ImageNet normalization; no augmentation |
-| `needs_review` | `True` when the model's confidence is below 0.95; only a flag for a human check, the prediction is kept |
-| Neysan -> `unknown` | a Neysan is not accepted as a `vanet`: if the Neysan detector (`neysan_detector.json`, SHA256 `1f4106cb...`) gives p(Neysan) >= 0.5, the output is `unknown`. Details: [NEYSAN_REJECTION.md](NEYSAN_REJECTION.md) |
+| `needs_review` | `True` when the model's confidence is below 0.90; only a flag for a human check, the prediction is kept |
+| Neysan -> `unknown` | a Neysan is not accepted as a `vanet`: if the Neysan detector (`neysan_detector_v3.json`, SHA256 `69bc046a...`) gives p(Neysan) >= 0.5, the output is `unknown`. Details: [NEYSAN_REJECTION.md](NEYSAN_REJECTION.md) |
 
 The runner checks the SHA256 of the model file and of the detector before predicting.
 
@@ -21,7 +21,7 @@ The runner checks the SHA256 of the model file and of the detector before predic
 
 - **The project code:** this repository.
 - **The model and the detector:**
-  - `swin_t_ft_aug_best.pt` and `neysan_detector.json` are not in Git; you receive them separately.
+  - `v3_final_best.pt` and `neysan_detector_v3.json` are not in Git; you receive them separately.
   - Put both in `checkpoints/`, or pass their paths with `--checkpoint` and `--neysan-detector`.
 - **Python packages:**
   - Python 3.9+ with `torch`, `torchvision`, `Pillow`, `numpy`, `matplotlib`.
@@ -62,11 +62,14 @@ On Windows, put paths with spaces in quotes: `--input "D:\mentor data\TEST"`.
 |---|---|
 | `--input` | test folder (required) |
 | `--output` | result folder (default `results`); must be new or empty, unless `--overwrite` |
-| `--checkpoint` | model file (default `checkpoints/swin_t_ft_aug_best.pt`) |
-| `--neysan-detector` | detector file (default `checkpoints/neysan_detector.json`) |
+| `--checkpoint` | model file (default `checkpoints/v3_final_best.pt`) |
+| `--neysan-detector` | detector file (default `checkpoints/neysan_detector_v3.json`) |
 | `--no-neysan-detector` | plain 8-class output, never `unknown` |
 | `--batch-size` | images per step (default 32); lower it if the GPU runs out of memory |
 | `--device` | `auto` (GPU if available), `cpu` or `cuda` |
+| `--overwrite` | allow a non-empty output folder |
+| `--no-report-images` | skip the per-test picture pages (faster) |
+| `--review-threshold` | another `needs_review` threshold (default 0.90; not for the official test) |
 
 ## Result files
 
@@ -77,10 +80,17 @@ On Windows, put paths with spaces in quotes: `--input "D:\mentor data\TEST"`.
 | `predictions.csv` | one row per image |
 | `wrong_predictions.csv` | images whose output differs from their folder |
 | `unknown_predictions.csv` | images reported as `unknown` (Neysan) |
-| `needs_review.csv` | images with confidence below 0.95 |
+| `needs_review.csv` | images with confidence below 0.90 |
 | `confusion_matrix.png` / `.csv` | rows = true class, columns = predicted class plus `unknown` |
 | `failed_images.csv` | images that could not be opened (with the error) |
 | `skipped_files.csv` | files that are not images |
+| `<test>/` | one folder per test group (`all` when there are none), see below |
+
+Each test-group folder holds that group's `confusion_matrix.png` / `.csv`, `wrong.csv`,
+`needs_review.csv` and `unknown.csv`, plus picture pages for a quick visual check: `errors_N.png`,
+`unknown_N.png` and `needs_review_N.png`. Each page shows 48 thumbnails, titled with the file name,
+the folder class, the output and the score. These pages show test images, so keep result folders out
+of Git (`results/` is ignored).
 
 Columns of `predictions.csv`:
 
@@ -93,7 +103,7 @@ Columns of `predictions.csv`:
 | `model_class` | the 8-class model's prediction (before the Neysan rule) |
 | `neysan_score` | p(Neysan) |
 | `confidence` | the 8-class model's highest probability |
-| `needs_review` | `True` if confidence < 0.95 |
+| `needs_review` | `True` if confidence < 0.90 |
 | `correct` | `True` / `False`; `unknown` always counts as `False` |
 | `p_ambulance` ... `p_vanet` | the 8 class probabilities |
 
@@ -120,4 +130,4 @@ CSV files are UTF-8 with BOM, so Excel opens them correctly.
 | everything is "without class folder" | check the folder spelling (`kamyunet`, not `kamionet`) |
 
 GPU and CPU can differ in the last decimals of a probability. This can only change an image whose
-confidence is extremely close to 0.95, or whose Neysan score is extremely close to 0.5.
+confidence is extremely close to 0.90, or whose Neysan score is extremely close to 0.5.

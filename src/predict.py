@@ -6,7 +6,8 @@ Usage (from the repository root):
 Prints JSON, one object per image:
     {"path": ..., "predicted_class": ..., "confidence": ..., "probabilities": {...}, "needs_review": ...}
 
-- Model: the checkpoint selected on validation (decisions/REOPEN_FINAL_MODEL_SELECTION.md).
+- Model: v3_final, Swin-Tiny trained on dataset v3 (reports/experiments/27_v3_dataset_and_final_model.md).
+  This is the plain 8-class output; the Neysan -> unknown step is only in run_test.py.
 - Preprocessing: the transform recorded in the checkpoint, i.e. RESNET_TRANSFORM:
   Resize((224, 224)) -> ToTensor -> ImageNet normalization. No training augmentation.
 - needs_review: True when the confidence (highest softmax probability) is below

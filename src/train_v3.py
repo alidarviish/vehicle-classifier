@@ -4,16 +4,16 @@ Run from the repository root, for example:
     python -m src.train_v3 --run-name v3_timing --timing 20
     python -m src.train_v3 --run-name v3_base
     python -m src.train_v3 --run-name v3_aug --aug strong
-    python -m src.train_v3 --run-name v3_aug_ls --aug strong --label-smoothing 0.1 --scheduler cosine
+    python -m src.train_v3 --run-name v3_final --aug strong --unfreeze top2     (the final model)
 
-Settings (everything else is the same as the final model swin_t_ft_aug):
-    --aug             old    = crop 0.8-1 + flip + rotation 10 + brightness/contrast (the final model)
+Settings (everything else is the same as the earlier model swin_t_ft_aug):
+    --aug             old    = crop 0.8-1 + flip + rotation 10 + brightness/contrast (as swin_t_ft_aug)
                       strong = crop 0.7-1 + flip + rotation 10 + brightness/contrast/saturation 0.3
                                + hue 0.02 + grayscale (20%) + blur (30%) + random erasing (30%)
-    --unfreeze        top    = last stage + norm (the final model)
-                      top2   = also the stage before it (more capacity for strong augmentation)
-    --label-smoothing 0 = off (the final model), 0.1 = recommended
-    --scheduler       none = constant learning rate (the final model), cosine = slowly down to ~0
+    --unfreeze        top    = last stage + norm (as swin_t_ft_aug)
+                      top2   = also the stage before it (used by v3_final)
+    --label-smoothing 0 = off (used by v3_final), e.g. 0.1 = on (not used in the recorded runs)
+    --scheduler       none = constant learning rate (used by v3_final), cosine = slowly down to ~0
     --timing N        only run N training batches, print the time and stop (to plan CPU runs)
 
 Only Train and Validation are read; the test folders are never touched.
@@ -46,13 +46,13 @@ SEED = 42
 SIZE = 224
 MEAN, STD = [0.485, 0.456, 0.406], [0.229, 0.224, 0.225]
 BATCH_SIZE = 32
-HEAD_LR, BACKBONE_LR = 1e-3, 1e-4      # same as the final model
+HEAD_LR, BACKBONE_LR = 1e-3, 1e-4      # same as swin_t_ft_aug
 WARMUP_EPOCHS = 5                      # head only in epochs 1-5, then the backbone stages too
 UNFREEZE = {"top": (6, 7), "top2": (4, 5, 6, 7)}
 
 
 def train_transform(aug):
-    """old = the final model's augmentation; strong = more variety for better generalization."""
+    """old = the augmentation of swin_t_ft_aug; strong = more variety for better generalization."""
     if aug == "old":
         return transforms.Compose([
             transforms.RandomResizedCrop(SIZE, scale=(0.8, 1.0)),

@@ -1,85 +1,71 @@
 # Neysan rejection (`unknown` output)
 
-Added 2026-10-08. The 8-class model is unchanged; this is one extra step in the test runner.
+The 8-class model has no Neysan class. The test runner adds one step on top of it, so that a Neysan
+pickup is reported as `unknown` instead of `vanet`. The 8-class model itself is not changed.
 
 ## Why
 
-The mentors' test rule is that a Neysan pickup must **not** be treated as a `vanet`. The project's
-earlier taxonomy (`decisions/REVIEW_PROTOCOL.md`, `reports/experiments/25_swin_neysan_evaluation.md`)
-treated Neysan as a subtype of `vanet`, and the 8-class model predicts `vanet` for about 89% of
-Neysan images. To follow the mentors' rule without retraining, the runner reports such images as
-`unknown` instead of one of the 8 classes.
+The mentors' rule is that a Neysan (the common Iranian Nissan pickup) must **not** be accepted as a
+`vanet`. Neysan was never one of the 8 classes; without this step the model predicts `vanet` for most
+Neysan images.
 
 ## How it works
 
-- **Features:** for every image, the runner takes the 768-number feature vector that the frozen model
-  feeds into its last layer (`model.net.head`).
+- **Features:** for every image, the runner takes the 768-number feature vector that the model feeds
+  into its last layer (`model.net.head`).
 - **Detector:** a logistic regression ("Neysan / not Neysan") with standardization is applied to that
-  vector. The file is `checkpoints/neysan_detector.json`, SHA256
-  `1f4106cbcef2c9ad3d7b5b64e017ede1f4ce03ecbdc3fb9527af0a26a845e3c7`. It is built for checkpoint
-  SHA256 `f03bacde...64db` only; the runner checks both values.
-- **Rule:** if p(Neysan) ≥ 0.5, the output is `unknown`, whatever the 8-class prediction was. The 0.5
-  threshold was fixed in advance, not tuned. Otherwise the 8-class prediction is kept unchanged.
-- **`needs_review`:** still the 8-class confidence < 0.95, as before.
-- **Turning it off:** `--no-neysan-detector` gives the plain 8-class output. If the default detector
-  file is missing, the runner prints a warning and runs the 8-class model only.
+  vector. File: `checkpoints/neysan_detector_v3.json`, SHA256
+  `69bc046a9c4655d8790e128afa60e8446c255a922523833a5cf03c1d3f57cf33`. It belongs to the model
+  `v3_final_best.pt` (SHA256 `bb8b159a...3d8848`) only; the runner checks both files.
+- **Rule:** if p(Neysan) >= 0.5, the output is `unknown`, whatever the 8-class prediction was. The 0.5
+  threshold was fixed in advance, not tuned. Otherwise the 8-class prediction is kept.
+- **`needs_review`:** independent of the detector: the 8-class confidence < 0.90.
+- **Turning it off:** `--no-neysan-detector` gives the plain 8-class output.
 
 ## How it was built
 
-Script: `scripts/build_neysan_detector.py`. The accepted file was made once on a GPU, with the same
-steps. The acceptance rules were written down before that run.
-
-Re-run on a computer:
-
 ```bash
-python scripts/build_neysan_detector.py
+python scripts/build_neysan_detector_v3.py
 ```
 
-- **Output file:** the re-run writes `checkpoints/neysan_detector_rerun.json`. The accepted
-  `neysan_detector.json` is never overwritten. CPU and GPU can differ in the last decimals, so a
-  re-run gets a different SHA256.
-- **Comparison:** at the end, the script reports on how many images the re-run makes the same
-  decision as the accepted detector.
+The script never reads the test folders. The acceptance rules were written down before the run.
 
-Training data and model:
-
-- **Negatives:** the 2633 training-split images (all 8 classes).
-- **Positives:** confirmed Neysan images from `decisions/neysan_eval.csv` (`basis = CONFIRMED_NEYSAN`),
-  split by SHA256 with seed 42 into train / calibration / holdout = 259 / 56 / 56.
+- **Negatives:** the 3418 training images of dataset v3 (all 8 classes).
+- **Positives:** trusted Neysan images (confirmed Neysan from our `vanet` folders and Neysan images from
+  the mentors' data), split by SHA256 with seed 42 into train / calibration / holdout = 70 / 15 / 15%
+  (315 / 68 / 68).
+- **Extra check only:** the N1 images (Neysan by folder name, never reviewed one by one).
 - **Model:** `StandardScaler` + `LogisticRegression(C=1.0, class_weight="balanced")`.
-- **Pipeline check first:** the frozen model reproduced its recorded validation result, 640 / 659.
-- **Data not used:** the historical 400-image Test set was not used.
 
-## Results (from that run)
+## Results
 
 | Check | Result | Acceptance rule |
 |---|---|---|
-| Holdout confirmed Neysan (never seen) rejected | 55 / 56 (0.982) | ≥ 0.80 |
-| Calibration confirmed Neysan rejected | 54 / 56 (0.964) | - |
-| N1 Neysan (folder label only, not reviewed; copies of training images excluded) rejected | 0.944 (n = 249) | - |
-| Validation images (659 ordinary images) rejected | 1 / 659 (one `vanet`) | ≤ 6 |
-| 8-class validation correct after rejection | 639 / 659 (was 640) | - |
+| Holdout trusted Neysan rejected | 67 / 68 (0.985) | >= 0.80 |
+| Calibration trusted Neysan rejected | 65 / 68 (0.956) | - |
+| N1 Neysan rejected | 0.980 | - |
+| Validation images (755 ordinary images) rejected | 2 / 755 | <= 7 |
+| 8-class validation correct after rejection | 742 / 755 (was 744) | - |
 | **Decision** | **PASS** | |
+
+On the mentors' test scenarios ([report 27](../reports/experiments/27_v3_dataset_and_final_model.md)):
+186 of 213 Neysan images (0.873) were rejected, and no ordinary test image was reported as `unknown`.
 
 ## How it shows in the results
 
-- **`predictions.csv`:**
-  - `predicted_class` is the final output: one of the 8 classes, or `unknown`;
-  - `model_class` is the 8-class prediction;
-  - `neysan_score` is p(Neysan).
-- **`unknown_predictions.csv`** lists the images that were rejected.
-- **Metrics:**
-  - an `unknown` output counts as wrong for the image's folder class;
-  - macro scores still average over the 8 classes;
-  - the confusion matrix gets a 9th column, `unknown`.
-
-  So on a test where Neysan images are placed in the `vanet` folder (or in other class folders), each
-  rejected Neysan lowers accuracy. This is intended: the model does not accept a Neysan as a `vanet`.
+- **`predictions.csv`:** `predicted_class` is the final output (one of the 8 classes, or `unknown`),
+  `model_class` is the 8-class prediction and `neysan_score` is p(Neysan).
+- **`unknown_predictions.csv`** and the `unknown_*.png` pages list the rejected images.
+- **Metrics:** an `unknown` output counts as wrong for the image's folder class; macro scores still
+  average over the 8 classes; the confusion matrix gets a 9th column, `unknown`.
 
 ## Limits
 
-- About 2% of the held-out Neysan images, and about 6% of the unreviewed N1 images, were not
-  rejected. They keep their 8-class prediction.
-- On ordinary images, about 1 in 659 may be rejected by mistake.
+- About 13% of the Neysan images in the mentors' scenarios were not rejected, against 1.5% of our own
+  held-out Neysan images: the mentors' Neysan images are harder for the detector.
+- On ordinary images, about 2 in 755 validation images were rejected by mistake.
 - GPU and CPU can differ in the last decimals, so an image with a score extremely close to 0.5 can
   differ between machines.
+
+The first detector, built for the earlier model `swin_t_ft_aug`, is described in
+[HISTORY.md](HISTORY.md#first-neysan-detector-swin_t_ft_aug).

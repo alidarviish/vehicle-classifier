@@ -1,10 +1,10 @@
 """Second evaluation of the frozen Test set, for the reopened final model `swin_t_ft_aug`.
 
 Run this ONCE, from the repository root, only after the protocol has been approved:
-    python scripts/evaluate_test_swin.py
+    python scripts/archive/evaluate_test_swin.py
 
 Context: the frozen Test set was first evaluated once for the previous final model
-`resnet224_ft_aug` (scripts/evaluate_test.py, reports/experiments/12_*). The final model selection
+`resnet224_ft_aug` (scripts/archive/evaluate_test.py, reports/experiments/12_*). The final model selection
 was later reopened on validation only (decisions/REOPEN_FINAL_MODEL_SELECTION.md) and
 `swin_t_ft_aug` was selected; its needs_review threshold 0.95 was chosen on validation only
 (reports/experiments/23_swin_needs_review_threshold.md). This run is therefore the SECOND use of
@@ -24,7 +24,7 @@ What it does, in this order:
    reports/experiments/24_swin_final_test_evaluation.md (never overwrites; mode "x").
 
 Read-only for the dataset, the manifest, the checkpoints and the historical outputs. Neysan is not
-used. scripts/evaluate_test.py and scripts/evaluate_neysan.py are not changed; only their
+used. scripts/archive/evaluate_test.py and scripts/archive/evaluate_neysan.py are not changed; only their
 model-independent helpers are imported.
 """
 
@@ -32,12 +32,12 @@ import sys
 from datetime import datetime, timezone
 from pathlib import Path
 
-REPO_ROOT = Path(__file__).resolve().parent.parent
+REPO_ROOT = Path(__file__).resolve().parents[2]
 if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
 # model-independent helpers of the historical Test evaluation (no model, checkpoint or threshold in them)
-from scripts.evaluate_test import (CLASSES, TEST_MANIFEST, TEST_PER_CLASS, compute_metrics,  # noqa: E402
+from scripts.archive.evaluate_test import (CLASSES, TEST_MANIFEST, TEST_PER_CLASS, compute_metrics,  # noqa: E402
                                    git_state, integrity_checks, prediction_rows, read_manifest,
                                    render_report, review_counts, sha256_of, verify_manifest, write_csv)
 
@@ -66,7 +66,7 @@ def render_swin_report(info, metrics, counts, checks):
     head = [
         "# Final Test evaluation: `swin_t_ft_aug` (second use of the frozen Test set)",
         "",
-        "Written by `scripts/evaluate_test_swin.py`.",
+        "Written by `scripts/archive/evaluate_test_swin.py`.",
         "",
         "## Protocol status",
         "",

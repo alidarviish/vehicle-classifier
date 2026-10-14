@@ -4,7 +4,7 @@ Nothing is changed: no raw file is touched, no label is changed,
 no image is removed. folder_label is used exactly as it is in the manifest.
 
 Usage:
-    python scripts/audit_dataset.py
+    python scripts/archive/audit_dataset.py
 """
 
 import csv

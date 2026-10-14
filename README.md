@@ -1,293 +1,146 @@
 # Vehicle Classifier
 
-8-class image classifier for vehicles cropped from traffic-camera images:
-`ambulance`, `autobus`, `kamyun`, `kamyunet`, `minibus`, `savari`, `taxi`, `vanet`.
+Image classifier for vehicles cropped from Iranian traffic-camera images. It sorts each image into one
+of 8 classes: `ambulance`, `autobus`, `kamyun` (truck), `kamyunet` (light truck), `minibus`,
+`savari` (passenger car), `taxi` and `vanet` (pickup). A separate detector reports the Neysan pickup
+as `unknown` instead of accepting it as a `vanet`.
 
-The dataset is private and is not part of this repository. Only relative image paths and SHA256
-hashes are recorded (`decisions/`, reports).
+**Final model:** Swin-Tiny (ImageNet pretrained), partially fine-tuned with strong augmentation on
+dataset v3, plus a logistic-regression Neysan detector on the model's features.
 
-## Pipeline
+| Result | Value |
+|---|---|
+| Validation (755 images) | accuracy 0.9854, macro F1 0.9850 |
+| Held-out mentor test0 (479 images) | **accuracy 0.9666, macro F1 0.9720** |
+| Neysan rejection, own held-out Neysan | 67 / 68 |
+| Neysan rejection, mentors' test scenarios | 186 / 213 |
+| Ordinary test images wrongly rejected | 0 / 479 |
 
-1. **Dataset audit.** Build a manifest of the raw images, then count images and find exact
-   duplicates by SHA256 (`reports/audit/`).
-2. **Decisions.** Apply the decisions in `decisions/` to the manifest, so that every image gets
-   exactly one status: train/val pool, Test candidate, Neysan evaluation or excluded. The rules are
-   in [`docs/DATA_DECISIONS.md`](docs/DATA_DECISIONS.md).
-3. **Train/validation split.** Seed 42, 20% validation, stratified per class, exact duplicates kept
-   together: 2633 train / 659 validation.
-4. **Experiments.** A CNN baseline and ablations, balanced batches, CE vs BCE, then ResNet18
-   transfer learning and combinations. Later, EfficientNet-B0, ConvNeXt-Tiny and Swin-Tiny were
-   compared under the same protocol. All are compared on validation only.
-5. **Final model.** Selected on validation. The project was first closed with `resnet224_ft_aug`;
-   the selection was later reopened and `swin_t_ft_aug` was selected
-   ([decision](decisions/REOPEN_FINAL_MODEL_SELECTION.md)). The `needs_review` threshold is also
-   chosen on validation.
-6. **Test.** The frozen 400-image Test set was evaluated once for `resnet224_ft_aug`. After
-   `swin_t_ft_aug` was selected on validation only, the same Test set was evaluated once more for it
-   ([report](reports/experiments/24_swin_final_test_evaluation.md)). This second use is a documented
-   protocol deviation, so that result is not a pristine held-out estimate.
-7. **Neysan evaluation.** A separate, inference-only analysis of 621 Neysan images (an unseen subtype
-   of `vanet`, not a class), run once for `resnet224_ft_aug` and once for `swin_t_ft_aug`.
-8. **Test runner and Neysan rejection.** `run_test.py` tests the final model on any folder of new
-   images (the mentors' test). A small Neysan detector on the model's features reports a Neysan as
-   `unknown` instead of `vanet`; the 8-class model is unchanged
-   ([details](docs/NEYSAN_REJECTION.md), [guide](docs/MENTOR_TEST_GUIDE.md)).
+<p align="center">
+  <img src="docs/figures/test0_confusion_matrix.png" alt="Confusion matrix on the mentors' test0" width="900">
+</p>
 
-## Setup
+The dataset is private: no image, checkpoint or private path is in this repository. Data lists record
+only relative paths and SHA256 hashes.
 
-```
+## How it works
+
+1. **Input:** the whole image is resized to 224x224 and normalized with ImageNet statistics.
+2. **8-class model:** Swin-Tiny (`torchvision.models.swin_t`) with a new `Linear(768, 8)` head. Training:
+   head only for 5 epochs, then the last two Swin stages (`features[4:8]`) and the final norm are
+   unfrozen with a 10x smaller learning rate.
+3. **Neysan detector:** a logistic regression on the 768-number feature vector that feeds the head. If
+   p(Neysan) >= 0.5, the output is `unknown`.
+4. **`needs_review`:** an image whose top probability is below 0.90 is flagged for a human check. The
+   prediction is kept.
+
+## Project journey
+
+Models were selected on validation only. Test sets were used only to report results (the older
+400-image Test was used twice, a documented deviation; see [HISTORY](docs/HISTORY.md)).
+
+| Stage | Model | Validation macro F1 | Report |
+|---|---|---:|---|
+| CNN from scratch | small CNN baseline | 0.8561 | [00](reports/experiments/00_baseline.md) |
+| Regularization and schedulers | best CNN combination (augmentation + plateau LR) | 0.8853 | [01-09](reports/README.md) |
+| Transfer learning | ResNet18, fine-tuning + augmentation | 0.9482 | [08](reports/experiments/08_resnet.md) |
+| Architecture comparison | EfficientNet-B0 / ConvNeXt-Tiny | 0.9485 / 0.9557 | [14-19](reports/README.md) |
+| Architecture comparison | Swin-Tiny, fine-tuning + augmentation | 0.9658 | [22](reports/experiments/22_swin_tiny_ft_aug.md) |
+| Dataset v3 and relabeling | **Swin-Tiny `v3_final`** | **0.9850*** | [27](reports/experiments/27_v3_dataset_and_final_model.md) |
+
+\* Dataset v3 has a different, larger validation set (755 instead of 659 images), so this number is
+not directly comparable with the rows above. On the same mentor test0, the previous Swin-Tiny model
+scored 0.9478 accuracy and `v3_final` 0.9666.
+
+What moved the numbers most:
+
+- **Pretrained models:** the move from a CNN trained from scratch to pretrained models.
+- **More data, cleaner labels:** half of the mentors' test0 added to training (dataset v3), and 59
+  `kamyun` / `kamyunet` labels corrected to one consistent rule.
+- **Training setup:** stronger augmentation and unfreezing one more Swin stage.
+
+<p align="center">
+  <img src="docs/figures/v3_final_training.png" alt="Training history of v3_final" width="850">
+</p>
+
+## Quick start
+
+```bash
 pip install -r requirements.txt
 ```
 
-Put the two raw datasets in `data/raw/` (`data/` is ignored by Git, so no image is committed), then
-copy `configs/local_paths.example.json` to `configs/local_paths.json`. `local_paths.json` is also
-ignored by Git. A relative path is read from the repository root, so the project works wherever its
-folder is.
+The model files are not in Git. Put `v3_final_best.pt` and `neysan_detector_v3.json` in
+`checkpoints/`.
 
-```json
-{"sources": {"v1": "data/raw/dataset", "v2": "data/raw/datasetv2_TrainUclean"}}
+**Test on a folder of labeled images** (one sub-folder per class; sub-folders per test group are
+allowed):
+
+```bash
+python run_test.py --input path/to/TEST --output results_test
 ```
 
-Image paths in all CSV files start with the source name (`v1/...`, `v2/...`). The paths in
-`local_paths.json` resolve them to local files. All commands run from the repository root.
+This writes a summary, per-image predictions, a confusion matrix and picture pages of the errors,
+`unknown` outputs and `needs_review` images. Details: [docs/MENTOR_TEST_GUIDE.md](docs/MENTOR_TEST_GUIDE.md).
 
-## Commands
+**Predict single images** (8-class JSON output, no Neysan step):
 
-The data scripts only read the raw images.
+```bash
+python -m src.predict path/to/image.jpg [more images]
+```
 
-| Step | Command |
-|---|---|
-| Manifest | `python scripts/build_manifest.py` (writes `data/manifest.csv`) |
-| Dataset audit | `python scripts/audit_dataset.py` (writes `reports/audit/`) |
-| Statuses (inspection) | `python scripts/build_statuses.py --overrides decisions/old_label_overrides.csv --out <file.csv>` |
-| Train/validation split | `python scripts/make_split.py --overrides decisions/old_label_overrides.csv --out data/split_manifest.csv` |
-| Rebuild the Test list (check only) | `python scripts/build_test.py --overrides decisions/old_label_overrides.csv --out <file.csv>` |
-| Training (baseline) | `python -m src.train` |
-| Training (final model) | `python -m src.train --run-name swin_t_ft_aug --model swin_tiny --swin-mode fine_tuning --augmentation full_aug` |
-| Training (previous final model, historical) | `python -m src.train --run-name resnet224_ft_aug --model resnet18 --resnet-mode fine_tuning --augmentation full_aug` |
-| Test evaluation (done once, historical `resnet224_ft_aug`) | `python scripts/evaluate_test.py` |
-| Test evaluation (done once, final model `swin_t_ft_aug`; second use of the frozen Test set) | `python scripts/evaluate_test_swin.py` |
-| Neysan evaluation (done once, historical `resnet224_ft_aug`) | `python scripts/evaluate_neysan.py` |
-| Neysan evaluation (done once, final model `swin_t_ft_aug`) | `python scripts/evaluate_neysan_swin.py --visibility-tags <tags.csv> --val-baseline <val_predictions.csv>` |
-| Prediction (JSON) | `python -m src.predict path/to/image.jpg [more images]` |
-| Test the final model on a folder of new images (mentor test) | `python run_test.py --input <folder>`, see [docs/MENTOR_TEST_GUIDE.md](docs/MENTOR_TEST_GUIDE.md) |
-| Build the Neysan detector (re-run; writes a new file) | `python scripts/build_neysan_detector.py` |
+**Train the final model** (needs `data/dataset_v3/` and `configs/local_paths.json`, copied from
+`configs/local_paths.example.json`):
 
-Notes on the commands:
+```bash
+python scripts/refresh_split_v3.py                      # data/split_manifest_v3.csv from the folders
+python -m src.train_v3 --run-name v3_final --aug strong --unfreeze top2
+python scripts/build_neysan_detector_v3.py              # needs_review threshold + Neysan detector
+```
 
-- **Output files.** `--out` files must not exist beforehand.
-- **Committed decision lists.** `decisions/test_frozen.csv` and `decisions/neysan_eval.csv` are
-  the committed lists; `build_test.py` output is only for comparison.
-- **Experiment commands.** The command for every experiment is in its report in
-  `reports/experiments/`.
-- **Generated files kept out of Git.** Training writes `checkpoints/<run_name>_best.pt` and
-  `reports/<run_name>_history.csv`; the validation analyses wrote `reports/analysis/<run_name>/`.
-- **Removed experiment scripts.** Scripts used only for finished experiments were removed on
-  2026-10-09: `analyze_baseline.py`, `val_error_audit.py`, `make_imbalanced_train.py`,
-  `verify_resnet.py`, `review_baseline_errors.py`, `make_contact_sheets.py` and
-  `make_labelled_sample_figure.py`. Their results stay in `reports/`. The code is in the Git
-  history (commit `78da5aa`).
-- **One-time scripts.** `evaluate_test.py` and `evaluate_neysan.py` refuse to run again once their
-  outputs exist. Both are fixed to the previous final model `resnet224_ft_aug` (checkpoint SHA256
-  and threshold 0.90) and are kept unchanged as historical scripts; they do not evaluate
-  `swin_t_ft_aug`. `evaluate_test_swin.py` evaluates `swin_t_ft_aug` on the frozen Test set, writes only
-  the `24_*` outputs and also refuses to run again. `evaluate_neysan_swin.py` evaluates `swin_t_ft_aug` on
-  the same Neysan set, writes only the `25_*` outputs and also refuses to run again.
+Training runs on CPU or GPU and saves `checkpoints/<run>_best.pt` and `reports/v3/<run>_history.csv`.
 
-## Final model
+## Repository layout
 
-Selected after the project was reopened; see
-[`decisions/REOPEN_FINAL_MODEL_SELECTION.md`](decisions/REOPEN_FINAL_MODEL_SELECTION.md).
+```
+run_test.py                 test the final model on a folder of images
+src/
+  train_v3.py               training on dataset v3 (final model)
+  train.py                  training for the earlier experiments 00-26
+  swin.py resnet.py ...     model definitions (Swin-Tiny, ResNet18, EfficientNet-B0, ConvNeXt-Tiny, CNN)
+  dataset.py                dataset and manifest reading
+  predict.py                single-image prediction (JSON)
+  test_runner.py            test runner, metrics, Neysan detector
+  test_report.py            per-test confusion matrices and picture pages
+scripts/
+  refresh_split_v3.py       rebuild the v3 split files from the folders
+  build_neysan_detector_v3.py
+  archive/                  scripts of earlier stages (see its README)
+decisions/                  data decisions: label corrections, frozen lists, relabel rounds
+reports/                    one report per experiment, index in reports/README.md
+docs/                       data decisions, test guide, Neysan detector, project history, figures
+```
 
-- **Run:** `swin_t_ft_aug`. Swin-Tiny with `IMAGENET1K_V1` weights, partial fine-tuning: head only
-  in epochs 1-5, then `features[6]`, `features[7]`, `norm` + head.
-- **Input and augmentation:** 224x224 input with ImageNet normalization. The train-only augmentation
-  is `full_aug`; there is no augmentation at inference.
-- **Training settings:** Adam (head 1e-3, unfrozen stages 1e-4), CrossEntropyLoss, 20 epochs, seed 42.
-- **Checkpoint:** `checkpoints/swin_t_ft_aug_best.pt` (epoch 17, not in Git).
-  SHA256 `f03bacde0a155461ea4aede0b813b8688d6ed17973d5ad19b0d2c1b913ff64db`.
-- **Validation (659 images):** accuracy 0.9712, macro precision 0.9626, macro recall 0.9698,
-  macro F1 0.9658. This is the highest validation macro F1 of the runs documented in
-  `reports/experiments/`.
-- **`needs_review`:** set when the confidence (the highest softmax probability) is below 0.95. The
-  threshold was chosen on validation
-  ([report](reports/experiments/23_swin_needs_review_threshold.md)) and is defined in
-  `src/predict.py`. It is only a flag for human review; no prediction is rejected. The threshold is
-  not stored in the frozen checkpoint.
-- **Neysan -> `unknown`:** in `run_test.py` only, an image the Neysan detector recognises
-  (p(Neysan) >= 0.5) is reported as `unknown`. See [Neysan](#neysan---unknown-in-the-test-runner-added-2026-10-08).
-- **Final Test:** run once for this model, after it was selected on validation only
-  ([report](reports/experiments/24_swin_final_test_evaluation.md)): accuracy 0.9550, macro F1 0.9545
-  (382 / 400). This is the second use of the frozen Test set, a documented protocol deviation; the
-  result is not a pristine held-out estimate and was not used for model selection or the threshold.
+## Documentation
 
-### Previous final model (historical)
-
-- **Run:** `resnet224_ft_aug`, ResNet18 fine-tuned (head only in epochs 1-5, then `layer4` + head).
-- **Checkpoint:** `checkpoints/resnet224_ft_aug_best.pt` (epoch 20), SHA256
-  `c26280e97f7324ee1ec85d7bf78a58ea0b4d2acb4cf3e975dbd52316366281a1`.
-- **Validation:** accuracy 0.9605, macro precision 0.9456, macro recall 0.9523, macro F1 0.9482.
-- **`needs_review` threshold:** 0.90
-  ([report](reports/experiments/11_needs_review_threshold.md)).
-- The Frozen Test results below and the historical Neysan results (`13_*`) belong to this model.
-
-## Frozen Test (previous final model, `resnet224_ft_aug`)
-
-- **Contents:** 400 images, 50 per class, listed in `decisions/test_frozen.csv`
-  (SHA256 `e1727eea750e73a4924d79fbb5fb810af8f8a05d822754c51ade8376e0622540`).
-- **Kept separate:** no image overlaps train, validation or Neysan, checked by path and SHA256.
-- **Used once:** Test was evaluated once for `resnet224_ft_aug`, after its model, threshold (0.90)
-  and inference protocol were fixed. It was not used for any decision, including the later
-  selection of `swin_t_ft_aug`. These results are historical and unchanged.
-- **Results:** 379 correct / 21 incorrect.
-  - Accuracy 0.9475, macro precision 0.9515, macro recall 0.9475, macro F1 0.9473.
-  - `needs_review`: 29 flagged, including 12 of the 21 errors.
-
-## Neysan
-
-- **Not a class.** Neysan (the common Iranian Nissan pickup) is a subtype of `vanet`, not a ninth
-  class. Neysan images were kept out of training, validation and Test.
-- **Evaluation set:** `decisions/neysan_eval.csv`, 621 images. 371 are human-confirmed; 250 come from
-  the `neysan` folders (policy N1) and were not individually reviewed.
-- **Input and image location:** `decisions/neysan_eval.csv` is the only Neysan input of the evaluation
-  scripts. The 621 images stay in the raw datasets (not in Git): the 371 human-confirmed images in
-  `vanet` folders and the 250 N1 images in the `<source>/unclean/neysan/` folders.
-- **Expected label:** each image is expected to be predicted as `vanet`. A confirmed Neysan image
-  predicted as `vanet` is not considered a classification error, because Neysan belongs to the
-  `vanet` class in the 8-class taxonomy.
-- **Three separate questions:** 8-class classification (is the image predicted `vanet`?), human
-  review (is it flagged `needs_review`?) and subtype identification (is it recognised as Neysan?).
-  The model can only be assessed on the first two; it has no output for the third.
-
-### Neysan -> `unknown` in the test runner (added 2026-10-08)
-
-The mentors' test rule is that a Neysan must not be accepted as a `vanet`. The 8-class model is
-unchanged; `run_test.py` adds one step on top of it:
-
-- **Detector:** a logistic regression on the 768-number feature vector of the frozen model
-  (`checkpoints/neysan_detector.json`, not in Git, delivered with the model file).
-- **Training data:** the 2633 training images and 259 of the 371 confirmed Neysan images. The 8-class
-  model was not retrained, and no image of the frozen Test set was used.
-- **Rule:** if p(Neysan) >= 0.5 (fixed in advance, not tuned), the output is `unknown` instead of one
-  of the 8 classes.
-- **Results:**
-  - 55 of 56 held-out confirmed Neysan images rejected;
-  - on validation, 1 of 659 ordinary images rejected (one `vanet`), so 639 / 659 correct
-    (640 without the detector).
-- **Details:** [docs/NEYSAN_REJECTION.md](docs/NEYSAN_REJECTION.md), built with
-  `scripts/build_neysan_detector.py`.
-
-The sections below describe the earlier 8-class evaluation and are unchanged.
-
-### Final model `swin_t_ft_aug` (threshold 0.95)
-
-Inference only, run once; [report](reports/experiments/25_swin_neysan_evaluation.md), per-image output
-`reports/experiments/25_swin_neysan_predictions.csv`. Results are reported separately for confirmed Neysan
-not from v1/test (337), confirmed Neysan from v1/test (34) and N1 (250).
-
-- **Classification (confirmed, not from v1/test):** 302 of 337 predicted `vanet`.
-- **Human review (confirmed, not from v1/test):** 101 of 337 flagged (30.0%), against 4 of 26 ordinary
-  validation `vanet` images (15.4%): +14.6 percentage points. The validation baseline is small, so the
-  size of this difference is imprecise.
-- **Non-`vanet` predictions (confirmed, not from v1/test):** 35, of which 32 were flagged for review.
-
-Neysan remains an unseen subtype of `vanet` and is not treated as a separate class. The Swin-Tiny
-model does not identify Neysan as a distinct subtype. However, confirmed Neysan images produced a higher
-human-review rate than ordinary validation `vanet` images (30.0% vs 15.4%). Among confirmed Neysan cases
-that were not predicted as `vanet`, most were flagged for human review. This supports `needs_review` as a
-robustness and human-review mechanism, but does not establish Neysan detection or guarantee detection of
-Neysan in the mentor-held Test set.
-
-The evaluation does not estimate Neysan prevalence in a mixed stream, and does not establish
-calibration, generalisation to other conditions or performance on the mentor-held Test set.
-
-### Previous final model `resnet224_ft_aug` (historical, threshold 0.90)
-
-- **Inference only:** the set was evaluated once with `resnet224_ft_aug`; these results are unchanged.
-- **Results:** 529 of 621 were predicted `vanet` (0.8519; 0.8544 on the 371 confirmed images), and
-  185 were flagged `needs_review`.
-- **Per-image output:** predictions and all 8 class probabilities are in
-  `reports/experiments/13_neysan_predictions.csv`.
-- **Descriptive only.** No precision, F1 or macro metric is reported for this set. Flag counts are not
-  comparable with the Swin-Tiny run, because the thresholds differ.
-
-## Architecture comparisons
-
-Run after the original final model was fixed. The EfficientNet-B0 comparison did not change
-`resnet224_ft_aug`, its threshold or `src/predict.py`.
-
-- **Tried:** feature extraction, then partial fine-tuning (the last three feature stages unfrozen from
-  epoch 6), a lower learning rate for those stages, and `full_aug`.
-- **Best EfficientNet-B0 run:** `effnet_b0_ft_none` (partial fine-tuning, no augmentation), validation accuracy
-  0.9560 and macro F1 0.9485.
-- **Learning rate:** 5e-5 for the fine-tuned stages was not better than the baseline 1e-4 in this setup.
-- **Augmentation:** `full_aug` gave macro F1 0.9466, with no overall improvement over the baseline, so the
-  augmentation is not changed for now.
-- **Scope:** validation only, one seed; the Final Test and the Neysan evaluation were not run again.
-- **Details:** [baseline](reports/experiments/14_efficientnet_b0_ft_baseline.md),
-  [learning rate](reports/experiments/15_efficientnet_b0_ft_lr5e5.md),
-  [`full_aug` review](reports/experiments/16_efficientnet_b0_ft_aug_review.md).
-- **Later comparisons:** ConvNeXt-Tiny ([17](reports/experiments/17_convnext_tiny_fe_none.md),
-  [18](reports/experiments/18_convnext_tiny_ft_none.md),
-  [19](reports/experiments/19_convnext_tiny_ft_aug.md)) and Swin-Tiny
-  ([20](reports/experiments/20_swin_tiny_fe_none.md),
-  [21](reports/experiments/21_swin_tiny_ft_none.md),
-  [22](reports/experiments/22_swin_tiny_ft_aug.md)) were compared under the same protocol;
-  `swin_t_ft_aug` led to the reopened final model selection.
-
-## Reports
-
-- [Reports index and validation comparison table](reports/README.md)
-- [Final model selection (original, ResNet)](reports/experiments/10_final_model_selection.md)
-- [Reopened final model selection (Swin-Tiny)](decisions/REOPEN_FINAL_MODEL_SELECTION.md)
-- [`needs_review` threshold, ResNet (historical)](reports/experiments/11_needs_review_threshold.md)
-- [`needs_review` threshold, Swin-Tiny](reports/experiments/23_swin_needs_review_threshold.md)
-- [Swin-Tiny fine-tuning with `full_aug`](reports/experiments/22_swin_tiny_ft_aug.md)
-- [CE vs BCE](reports/experiments/07_ce_vs_bce.md)
-- [ResNet18 experiments](reports/experiments/08_resnet.md)
-- [Final Test evaluation (ResNet, historical)](reports/experiments/12_final_test_evaluation.md)
-- [Final Test evaluation (Swin-Tiny, final model; second use of the frozen Test set)](reports/experiments/24_swin_final_test_evaluation.md)
-- [Neysan / unclean analysis (ResNet, historical)](reports/experiments/13_neysan_unclean_analysis.md)
-- [Neysan evaluation (Swin-Tiny, final model)](reports/experiments/25_swin_neysan_evaluation.md)
-- [Inference-time and kamyun / kamyunet boundary audits (diagnostic only)](reports/experiments/26_inference_audits.md)
+- [Reports index and all validation results](reports/README.md)
+- [Report 27: dataset v3 and the final model](reports/experiments/27_v3_dataset_and_final_model.md)
 - [Dataset decisions](docs/DATA_DECISIONS.md)
-- [Neysan -> `unknown` (Neysan detector)](docs/NEYSAN_REJECTION.md)
-- [Mentor test guide (`run_test.py`)](docs/MENTOR_TEST_GUIDE.md)
-
-## Reproducibility
-
-- **Seed and data files.** Seed 42 in every run. `data/manifest.csv` and `data/split_manifest.csv`
-  are generated and not tracked. `make_split.py` rebuilds the split from the manifest and
-  `decisions/`.
-- **Checkpoint check.** The final checkpoint SHA256 is recorded above and in
-  `reports/experiments/22_swin_tiny_ft_aug.md`. The previous final checkpoint SHA256 is recorded in
-  `reports/experiments/10_final_model_selection.md`; `evaluate_test.py` and `evaluate_neysan.py`
-  check that one before predicting.
-- **Before/after hashes.** The historical ResNet Neysan report (`13_neysan_unclean_analysis.md`)
-  records the SHA256 of the ResNet checkpoint, `test_frozen.csv`, `split_manifest.csv` and
-  `neysan_eval.csv`, before and after inference. The Swin reports 24 and 25 record the checkpoint and
-  manifest SHA256 and check that they are unchanged after inference.
-- **Not in Git:** raw images, checkpoints (including `neysan_detector.json`), histories, analysis
-  output and local paths.
+- [Neysan detector](docs/NEYSAN_REJECTION.md)
+- [Test guide (`run_test.py`)](docs/MENTOR_TEST_GUIDE.md)
+- [Project history before dataset v3](docs/HISTORY.md), with the earlier final models, the frozen
+  400-image Test and the Neysan evaluations
 
 ## Limitations
 
-- **Single seed.** Every configuration was trained once with seed 42. The differences between the
-  top runs are a few validation images.
-- **Validation reuse.** The same 659 validation images were used to compare runs, select the model
-  (twice, including the reopened selection) and choose both thresholds. 8 validation labels were
-  corrected after reviewing baseline errors.
-  Validation metrics are therefore not an unbiased estimate.
-- **Small dataset.** 2633 train / 659 validation / 400 Test images; for example, only 26 validation
-  images are `vanet`.
-- **Overfitting.** The final model shows signs of overfitting in the last epochs: validation loss
-  is lowest at epoch 11 while train loss keeps falling; the selected epoch is 17 of 20.
-- **Test.** Test was first run once for the previous final model `resnet224_ft_aug`. After
-  `swin_t_ft_aug` was selected on validation only, Test was run once more for it
-  ([report](reports/experiments/24_swin_final_test_evaluation.md)). This second use of the frozen
-  Test set is a documented protocol deviation, so the Swin result is not a pristine held-out
-  estimate; it was not used for model or threshold selection. Each result is a single estimate
-  without a confidence interval.
-- **Neysan detector.** It was trained on 259 confirmed Neysan images and checked on only 56 held-out
-  ones (55 rejected). On validation, 1 of 659 ordinary images was rejected by mistake. Its rejection
-  rate was not measured separately for night or infrared images.
+- **`kamyun` / `kamyunet`:** this boundary causes most of the remaining errors (11 of 16 on test0).
+- **Neysan:** the detector rejects 98.5% of our own held-out Neysan images, but only 87.3% of the
+  Neysan images in the mentors' test scenarios.
+- **Single runs:** each setting was trained once (seed 42), and validation was used both to select the
+  model and to choose the `needs_review` threshold.
+- **Same source:** half of the mentors' test0 is in the training data, so test0 measures images of a
+  known source, not a completely new camera.
+- **Target not reached:** the target of 0.98-0.99 on the mentor test was not reached.
+
+## Author
+
+Ali Darvish (علی درویش), AI Bootcamp 145.

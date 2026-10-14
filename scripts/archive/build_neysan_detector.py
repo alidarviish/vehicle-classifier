@@ -1,6 +1,6 @@
 """Build the Neysan detector used by run_test.py (docs/NEYSAN_REJECTION.md).
 
-    python scripts/build_neysan_detector.py
+    python scripts/archive/build_neysan_detector.py
 
 Images are read like everywhere else in the project: train / validation from data/split_manifest.csv,
 Neysan from decisions/neysan_eval.csv, local folders from configs/local_paths.json.
@@ -34,7 +34,7 @@ from pathlib import Path
 import numpy as np
 from PIL import Image
 
-REPO_ROOT = Path(__file__).resolve().parent.parent
+REPO_ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(REPO_ROOT))
 
 from src.dataset import (CLASSES, DEFAULT_CONFIG, DEFAULT_MANIFEST, load_source_roots,  # noqa: E402

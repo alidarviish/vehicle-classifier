@@ -30,6 +30,8 @@ contact_sheets/
 *.TIFF
 *.heic
 *.HEIC
+# result figures for the README (charts only, never dataset images)
+!docs/figures/*.png
 
 # Archives that may contain data
 *.zip
@@ -57,7 +59,8 @@ lightning_logs/
 *.h5
 *.pkl
 *.joblib
-# per-epoch training histories written by src/train.py (reports/<run_name>_history.csv)
+# per-epoch training histories written by src/train.py (reports/<run_name>_history.csv);
+# the v3 histories in reports/v3/ are committed
 reports/*_history.csv
 # generated analysis outputs (plots, tables, text) of finished experiments
 reports/analysis/
