@@ -28,7 +28,7 @@ Neysan images were not used.
 Preprocessing of these two runs (`RESNET_TRANSFORM` in `src/train.py`, used for train and validation):
 `Resize((224, 224))` -> `ToTensor` -> `Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])`.
 
-- 224x224 because the assignment asks for ImageNet-compatible resize and normalization for the
+- 224x224 because the project specification asks for ImageNet-compatible resize and normalization for the
   pretrained ResNet18, and 224 is the input size it is conventionally used with.
 - The whole image is resized without cropping, so the complete vehicle stays in the frame.
 - The CNN baseline and the earlier CNN experiments keep 128x128 with normalization 0.5 / 0.5.
@@ -45,7 +45,7 @@ Preprocessing of these two runs (`RESNET_TRANSFORM` in `src/train.py`, used for 
 
 - `conv1`, `bn1`, `layer1`, `layer2` and `layer3` stay frozen in both runs. Frozen parts are kept in
   eval mode, so their BatchNorm running statistics stay the ImageNet values.
-- Head first: the assignment asks for the head to be trained before `layer4` is unfrozen, but does
+- Head first: the project specification asks for the head to be trained before `layer4` is unfrozen, but does
   not fix for how long. The 5 head-only epochs are a design choice (`FT_WARMUP_EPOCHS = 5`); they
   keep the total budget equal to feature extraction (20 epochs).
 - Discriminative learning rates: the new head, which starts from random weights, keeps 1e-3; the

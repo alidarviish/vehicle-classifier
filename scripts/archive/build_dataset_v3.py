@@ -1,11 +1,11 @@
-"""Build dataset v3: our data + half of the mentor test data, in one simple folder.
+"""Build dataset v3: our data + half of the external test data, in one simple folder.
 
     python scripts/archive/build_dataset_v3.py
 
 Inputs (read only, nothing is changed):
     data/split_manifest.csv + data/raw/...   our Train (2633) and Validation (659)
     data/clean/test/                          our old Test (400), now used for training
-    data/mentor_test/TestingData/test0..4     the mentor test folders
+    data/external_test/TestingData/test0..4     the external test folders
     data/neysan/                              our Neysan images (only for the duplicate check)
 
 What it does:
@@ -13,13 +13,13 @@ What it does:
        the other half goes 80/20 to Train / Validation.
        Near-duplicate images (pHash distance <= 5) always stay on the same side, and a test0
        image that looks like one of our own images is never put in the test half.
-    2. The 157 extra Neysan images of the mentor tests are split 50/50 the same way.
+    2. The 157 extra Neysan images of the external tests are split 50/50 the same way.
     3. Writes data/dataset_v3/ :
            train/<class>/        val/<class>/
-           test/test0..test4/<folder>/   the mentor scenarios, only with test-half images
+           test/test0..test4/<folder>/   the external scenarios, only with test-half images
            neysan_extra/         Neysan images of the training half (for the Neysan detector)
            split_v3.csv          one row per image
-           review/               mentor training images the current model disagrees with
+           review/               external training images the current model disagrees with
     4. Writes data/split_manifest_v3.csv (Train + Validation, same format as split_manifest.csv).
 """
 import csv
@@ -36,7 +36,7 @@ from PIL import Image
 
 REPO = Path(__file__).resolve().parents[2]
 DATA = REPO / "data"
-MENTOR = DATA / "mentor_test" / "TestingData"
+EXTERNAL = DATA / "external_test" / "TestingData"
 OUT = DATA / "dataset_v3"
 CACHE = DATA / "phash_cache.csv"
 SEED = 42
@@ -109,7 +109,7 @@ def files(folder):
 
 # --- 1. collect every image ------------------------------------------------------------
 def collect():
-    """Returns our images, the test0 images, the extra Neysan images and the mentor folders."""
+    """Returns our images, the test0 images, the extra Neysan images and the external folders."""
     ours = []
     roots = {"v1": DATA / "raw" / "dataset", "v2": DATA / "raw" / "datasetv2_TrainUclean"}
     with open(DATA / "split_manifest.csv", encoding="utf-8-sig") as f:
@@ -122,22 +122,22 @@ def collect():
         ours.append({"path": p, "sha256": sha256(p), "label": label, "origin": "ours_test",
                      "name": "old_test_" + p.name})
 
-    mentor = {}                                    # test name -> {sha256: (folder, path)}
-    for t in sorted(d.name for d in MENTOR.iterdir() if d.is_dir()):
-        mentor[t] = {}
-        for p in files(MENTOR / t):
-            mentor[t][sha256(p)] = (p.parent.name, p)
-    test0 = [{"path": p, "sha256": h, "label": folder, "origin": "mentor", "name": "mentor_" + p.name}
-             for h, (folder, p) in mentor["test0"].items()]
+    external = {}                                    # test name -> {sha256: (folder, path)}
+    for t in sorted(d.name for d in EXTERNAL.iterdir() if d.is_dir()):
+        external[t] = {}
+        for p in files(EXTERNAL / t):
+            external[t][sha256(p)] = (p.parent.name, p)
+    test0 = [{"path": p, "sha256": h, "label": folder, "origin": "external", "name": "external_" + p.name}
+             for h, (folder, p) in external["test0"].items()]
     extra = {}
-    for t, items in mentor.items():
+    for t, items in external.items():
         for h, (folder, p) in items.items():
-            if h not in mentor["test0"]:
+            if h not in external["test0"]:
                 extra[h] = p
-    neysan = [{"path": p, "sha256": h, "label": "neysan", "origin": "mentor_neysan",
-               "name": "mentor_" + p.name} for h, p in extra.items()]
+    neysan = [{"path": p, "sha256": h, "label": "neysan", "origin": "external_neysan",
+               "name": "external_" + p.name} for h, p in extra.items()]
     our_neysan = [{"path": p, "sha256": sha256(p)} for p in files(DATA / "neysan")]
-    return ours, test0, neysan, our_neysan, mentor
+    return ours, test0, neysan, our_neysan, external
 
 
 def add_phashes(rows):
@@ -200,12 +200,12 @@ def split_groups(groups, share, rng):
 def main():
     rng = random.Random(SEED)
     print("reading images ...", flush=True)
-    ours, test0, neysan, our_neysan, mentor = collect()
+    ours, test0, neysan, our_neysan, external = collect()
     save_sha_cache()
     print("pHash ...", flush=True)
     add_phashes(ours + test0 + neysan + our_neysan)
 
-    # a mentor image that looks like one of our images must not be in the test half
+    # an external image that looks like one of our images must not be in the test half
     known = [r["phash"] for r in ours]
     known_neysan = [r["phash"] for r in our_neysan]
     for r in test0:
@@ -240,10 +240,10 @@ def main():
             continue
         copy(r["path"], OUT / r["new_path"])
 
-    # the mentor scenarios (test2, test3, test4) with only the test-half images
+    # the external scenarios (test2, test3, test4) with only the test-half images
     test_shas = {r["sha256"] for r in test_half} | {r["sha256"] for r in neysan_test}
     scenario_counts = {}
-    for t, items in mentor.items():
+    for t, items in external.items():
         n = 0
         for h, (folder, p) in items.items():
             if h in test_shas:
@@ -267,9 +267,9 @@ def main():
                 w.writerow(["v3/" + r["new_path"], r["sha256"], r["label"], r["split"], "v3",
                             r["origin"], r["label"], ""])
 
-    # --- 4. review list: mentor training images the current model gets wrong ----------
+    # --- 4. review list: external training images the current model gets wrong ----------
     review = []
-    pred_file = DATA / "mentor_test_results" / "predictions.csv"
+    pred_file = DATA / "external_test_results" / "predictions.csv"
     if pred_file.exists():
         with open(pred_file, encoding="utf-8-sig") as f:
             preds = {r["image_path"].replace("\\", "/"): r for r in csv.DictReader(f)}
@@ -294,9 +294,9 @@ def main():
         cnt = Counter(r["label"] for r in part)
         print(f"{s:14s}" + "".join(f"{cnt[c]:10d}" for c in CLASSES) + f"{len(part):8d}")
     print()
-    print("mentor test0 :", len(test0), "| test half", len(test_half), "| train", len(train_part),
+    print("external test0 :", len(test0), "| test half", len(test_half), "| train", len(train_part),
           "| val", len(val_part), "| looks like our data (kept out of test)", sum(r["forced_train"] for r in test0))
-    print("mentor Neysan:", len(neysan), "| test half", len(neysan_test), "| neysan_extra", len(neysan_train))
+    print("external Neysan:", len(neysan), "| test half", len(neysan_test), "| neysan_extra", len(neysan_train))
     print("test scenarios:", scenario_counts)
     print("review list  :", len(review), "images ->", OUT / "review" / "review.csv")
 

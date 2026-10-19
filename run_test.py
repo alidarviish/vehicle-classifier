@@ -4,7 +4,7 @@
 
 Images inside class folders (ambulance/, autobus/, ... vanet/) are scored against the folder name.
 An image the Neysan detector recognises as a Neysan is reported as "unknown".
-Guide: docs/MENTOR_TEST_GUIDE.md. The code is in src/test_runner.py.
+Guide: docs/TEST_GUIDE.md. The code is in src/test_runner.py.
 """
 
 import argparse

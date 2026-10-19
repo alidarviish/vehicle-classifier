@@ -10,7 +10,7 @@ hashes are recorded here and in `decisions/`.
 - The model has exactly 8 classes: ambulance, autobus, kamyun, kamyunet, minibus, savari, taxi, vanet
   (`src/dataset.py`, `CLASSES`).
 - Neysan is not a ninth class. It is a subtype of `vanet` (model label `vanet`, subtype `neysan`),
-  confirmed by the professor (`decisions/REVIEW_PROTOCOL.md`).
+  confirmed by the project owner (`decisions/REVIEW_PROTOCOL.md`).
   Since 2026-10-08, the test runner also reports an image as `unknown` when a separate Neysan
   detector recognises it; the 8-class model and these data decisions are unchanged
   ([NEYSAN_REJECTION.md](NEYSAN_REJECTION.md)).
@@ -169,13 +169,13 @@ The inputs and lists that were missing are now in the repository:
 ## Dataset v3 (current)
 
 The rules above built the v1/v2 split (2633 train / 659 validation / 400 Test). The current final model
-is trained on dataset v3, which adds half of the mentors' test0 and moves our old Test into train. Two
+is trained on dataset v3, which adds half of the external test0 and moves our old Test into train. Two
 decisions were added for v3; details in
 [report 27](../reports/experiments/27_v3_dataset_and_final_model.md).
 
 - **Near duplicates across the test boundary.** Images with a pHash distance <= 5 stay on the same side,
-  and a mentor image that looks like one of our own images is never put in the test half.
-- **`kamyun` / `kamyunet` follow the mentor rule.** Light cab-over trucks (Isuzu, JAC, Hyundai, Foton)
+  and an external image that looks like one of our own images is never put in the test half.
+- **`kamyun` / `kamyunet` follow the external labeling rule.** Light cab-over trucks (Isuzu, JAC, Hyundai, Foton)
   are `kamyunet`; heavy trucks (Scania, Volvo FH, heavy or bonneted Mercedes-Benz, FAW, dump trucks,
   tractor units) are `kamyun`. 59 train / validation images were relabeled in two rounds:
   `decisions/v3_kamyun_relabel_round1.csv` (41) and `decisions/v3_kamyun_relabel_round2.csv` (18).

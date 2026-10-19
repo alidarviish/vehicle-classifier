@@ -1,4 +1,4 @@
-"""Test runner for the final model on a folder of new images (for example the mentors' test set).
+"""Test runner for the final model on a folder of new images (for example an external test set).
 
 Start it with:  python run_test.py --input path/to/TEST
 

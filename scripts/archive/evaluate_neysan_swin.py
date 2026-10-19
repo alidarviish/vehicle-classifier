@@ -269,7 +269,7 @@ def render_report(info, rows, checks, val_rows, test_rows):
           "- Silent acceptance (predicted `vanet`, not flagged) is not an 8-class classification error.",
           "- N1 images were not individually reviewed; their labels may be noisy.",
           "- The validation baseline has 26 images, so the flag-rate difference is imprecise.",
-          "- This evaluation cannot predict the result on the mentor-held Test set.",
+          "- This evaluation cannot predict the result on the external held-out test set.",
           "- The set is 100% Neysan, so it cannot estimate Neysan prevalence, or the share of flagged images that",
           "  are Neysan, in a mixed stream.",
           "- It does not establish general calibration or generalisation to other cameras or conditions.",

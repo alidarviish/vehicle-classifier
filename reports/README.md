@@ -3,7 +3,7 @@
 ## Current final model: `v3_final` (dataset v3)
 
 [Report 27](experiments/27_v3_dataset_and_final_model.md) covers dataset v3 (our data plus half of
-the mentors' test0), the `kamyun` / `kamyunet` relabeling, the six v3 training runs, the v3 Neysan
+the external test0), the `kamyun` / `kamyunet` relabeling, the six v3 training runs, the v3 Neysan
 detector and the final test. Histories of the v3 runs: [`v3/`](v3/).
 
 | Run | Val accuracy | Val macro F1 | Note |
@@ -15,7 +15,7 @@ detector and the final test. Histories of the v3 runs: [`v3/`](v3/).
 | `v3_aug_top2_rl` | 0.9854 | 0.9803 | labels after relabel round 1 |
 | **`v3_final`** | **0.9854** | **0.9850** | labels after relabel rounds 1+2; final model |
 
-Final test, mentors' test0 (479 held-out images): accuracy 0.9666, macro F1 0.9720
+Final test, external test0 (479 held-out images): accuracy 0.9666, macro F1 0.9720
 (`swin_t_ft_aug`: 0.9478 / 0.9361). The v3 validation set (755 images) differs from the one below
 (659 images), so the two tables are not directly comparable.
 
@@ -93,7 +93,7 @@ ConvNeXt-Tiny and Swin-Tiny with the same split, 224x224 input and ImageNet norm
 
 ## Validation comparison table
 
-Main experiments of the assignment, compared on validation only: 659 images of
+Main experiments of the project, compared on validation only: 659 images of
 `data/split_manifest.csv` with the current labels, seed 42. Each row is the checkpoint with the highest
 validation macro F1 of that run. The lowest-recall and lowest-precision classes come from the
 per-class metrics of the same checkpoint (no ties in any row). The test set and the Neysan images
@@ -137,7 +137,7 @@ selected run, the regularization is augmentation (`full_aug`), combined with Red
 which halved the learning rate after epochs 13 and 18. Each run was trained once with seed 42. See
 `experiments/09_combined_aug_plateau.md`.
 
-[5] Additional ResNet run, not one of the six rows the assignment requires. It is the same as the
+[5] Additional ResNet run, not one of the six rows the project plan requires. It is the same as the
 fine-tuning row except for train-only augmentation `full_aug`, adapted to 224x224 and ImageNet
 normalization. Validation is unchanged (`RESNET_TRANSFORM`, no augmentation). It is recorded
 regardless of its result; no run is removed from this table because it scored better or worse.
@@ -252,7 +252,7 @@ model does not identify Neysan as a distinct subtype. However, confirmed Neysan 
 human-review rate than ordinary validation `vanet` images (30.0% vs 15.4%). Among confirmed Neysan cases
 that were not predicted as `vanet`, most were flagged for human review. This supports `needs_review` as a
 robustness and human-review mechanism, but does not establish Neysan detection or guarantee detection of
-Neysan in the mentor-held Test set.
+Neysan in the external held-out test set.
 
 The results are descriptive only; no model, threshold, label or Test decision was made from them.
 

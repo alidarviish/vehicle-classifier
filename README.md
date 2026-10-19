@@ -11,13 +11,13 @@ dataset v3, plus a logistic-regression Neysan detector on the model's features.
 | Result | Value |
 |---|---|
 | Validation (755 images) | accuracy 0.9854, macro F1 0.9850 |
-| Held-out mentor test0 (479 images) | **accuracy 0.9666, macro F1 0.9720** |
+| Held-out external test0 (479 images) | **accuracy 0.9666, macro F1 0.9720** |
 | Neysan rejection, own held-out Neysan | 67 / 68 |
-| Neysan rejection, mentors' test scenarios | 186 / 213 |
+| Neysan rejection, external test scenarios | 186 / 213 |
 | Ordinary test images wrongly rejected | 0 / 479 |
 
 <p align="center">
-  <img src="docs/figures/test0_confusion_matrix.png" alt="Confusion matrix on the mentors' test0" width="900">
+  <img src="docs/figures/test0_confusion_matrix.png" alt="Confusion matrix on the external test0" width="900">
 </p>
 
 The dataset is private: no image, checkpoint or private path is in this repository. Data lists record
@@ -49,13 +49,13 @@ Models were selected on validation only. Test sets were used only to report resu
 | Dataset v3 and relabeling | **Swin-Tiny `v3_final`** | **0.9850*** | [27](reports/experiments/27_v3_dataset_and_final_model.md) |
 
 \* Dataset v3 has a different, larger validation set (755 instead of 659 images), so this number is
-not directly comparable with the rows above. On the same mentor test0, the previous Swin-Tiny model
+not directly comparable with the rows above. On the same external test0, the previous Swin-Tiny model
 scored 0.9478 accuracy and `v3_final` 0.9666.
 
 What moved the numbers most:
 
 - **Pretrained models:** the move from a CNN trained from scratch to pretrained models.
-- **More data, cleaner labels:** half of the mentors' test0 added to training (dataset v3), and 59
+- **More data, cleaner labels:** half of the external test0 added to training (dataset v3), and 59
   `kamyun` / `kamyunet` labels corrected to one consistent rule.
 - **Training setup:** stronger augmentation and unfreezing one more Swin stage.
 
@@ -80,7 +80,7 @@ python run_test.py --input path/to/TEST --output results_test
 ```
 
 This writes a summary, per-image predictions, a confusion matrix and picture pages of the errors,
-`unknown` outputs and `needs_review` images. Details: [docs/MENTOR_TEST_GUIDE.md](docs/MENTOR_TEST_GUIDE.md).
+`unknown` outputs and `needs_review` images. Details: [docs/TEST_GUIDE.md](docs/TEST_GUIDE.md).
 
 **Predict single images** (8-class JSON output, no Neysan step):
 
@@ -126,7 +126,7 @@ docs/                       data decisions, test guide, Neysan detector, project
 - [Report 27: dataset v3 and the final model](reports/experiments/27_v3_dataset_and_final_model.md)
 - [Dataset decisions](docs/DATA_DECISIONS.md)
 - [Neysan detector](docs/NEYSAN_REJECTION.md)
-- [Test guide (`run_test.py`)](docs/MENTOR_TEST_GUIDE.md)
+- [Test guide (`run_test.py`)](docs/TEST_GUIDE.md)
 - [Project history before dataset v3](docs/HISTORY.md), with the earlier final models, the frozen
   400-image Test and the Neysan evaluations
 
@@ -134,13 +134,13 @@ docs/                       data decisions, test guide, Neysan detector, project
 
 - **`kamyun` / `kamyunet`:** this boundary causes most of the remaining errors (11 of 16 on test0).
 - **Neysan:** the detector rejects 98.5% of our own held-out Neysan images, but only 87.3% of the
-  Neysan images in the mentors' test scenarios.
+  Neysan images in the external test scenarios.
 - **Single runs:** each setting was trained once (seed 42), and validation was used both to select the
   model and to choose the `needs_review` threshold.
-- **Same source:** half of the mentors' test0 is in the training data, so test0 measures images of a
+- **Same source:** half of the external test0 is in the training data, so test0 measures images of a
   known source, not a completely new camera.
-- **Target not reached:** the target of 0.98-0.99 on the mentor test was not reached.
+- **Target not reached:** the target of 0.98-0.99 on the external test was not reached.
 
 ## Author
 
-Ali Darvish (علی درویش), AI Bootcamp 145.
+Ali Darvish (علی درویش).

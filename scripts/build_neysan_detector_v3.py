@@ -11,7 +11,7 @@ Steps:
   2. needs_review threshold on validation: the lowest of 0.70 / 0.80 / 0.90 / 0.95 that flags at least
      half of the validation errors (the same rule as before)
   3. split the trusted Neysan images by SHA256 (seed 42): 70% train, 15% calibration, 15% holdout
-     trusted = confirmed Neysan from our vanet folders + Neysan images from the mentor data;
+     trusted = confirmed Neysan from our vanet folders + Neysan images from the external data;
      the N1 folder images (never reviewed one by one) are only an extra check
   4. logistic regression "Neysan / not Neysan" on all train images + 70% of the trusted Neysan
   5. measure with the FIXED threshold 0.5 and save checkpoints/neysan_detector_v3.json
@@ -129,7 +129,7 @@ def main():
     # ---- 5. measure with the fixed threshold
     rej_val = rejected(Fva)
     ho, ca, n1r = rejected(Fny[ny_ho]), rejected(Fny[ny_ca]), rejected(Fny[n1_check])
-    ho_mentor = [k for k, i in enumerate(ny_ho) if neysan[i].name.startswith("mentor_")]
+    ho_external = [k for k, i in enumerate(ny_ho) if neysan[i].name.startswith("external_")]
     correct_kept = int((~wrong & ~rej_val).sum())
     max_val_rejected = int(0.01 * len(val))
     passed = ho.mean() >= 0.80 and rej_val.sum() <= max_val_rejected
@@ -137,7 +137,7 @@ def main():
     print("\n===== RESULT =====")
     print(f"trusted Neysan train / calib / holdout : {len(ny_tr)} / {len(ny_ca)} / {len(ny_ho)}")
     print(f"holdout Neysan rejected   : {ho.mean():.3f} ({int(ho.sum())}/{len(ho)})   rule >= 0.80")
-    print(f"  of which mentor images  : {int(ho[ho_mentor].sum())}/{len(ho_mentor)}")
+    print(f"  of which external images  : {int(ho[ho_external].sum())}/{len(ho_external)}")
     print(f"calibration rejected      : {ca.mean():.3f} ({int(ca.sum())}/{len(ca)})")
     print(f"N1 (not reviewed) rejected: {n1r.mean():.3f} (n={len(n1_check)})")
     print(f"validation rejected       : {int(rej_val.sum())}/{len(val)}   rule <= {max_val_rejected}")

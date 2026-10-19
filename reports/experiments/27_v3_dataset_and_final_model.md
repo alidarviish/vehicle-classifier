@@ -1,7 +1,7 @@
 # 27 - Dataset v3 and the final model `v3_final`
 
-Goal: better generalization to the mentors' images while keeping Swin-Tiny. The earlier final model
-`swin_t_ft_aug` (report 22) reached 0.9478 on the mentors' test0; most errors were `kamyun` /
+Goal: better generalization to the external images while keeping Swin-Tiny. The earlier final model
+`swin_t_ft_aug` (report 22) reached 0.9478 on the external test0; most errors were `kamyun` /
 `kamyunet` and images whose style differs from our own data.
 
 ## 1. Dataset v3
@@ -11,22 +11,22 @@ one sub-folder per split and class, and `split_v3.csv` with one row per image (p
 split). `scripts/refresh_split_v3.py` rebuilds that CSV and `data/split_manifest_v3.csv` from the
 folders after manual changes, and checks that no test image is also in train, validation or Neysan.
 
-- **Mentor data split in two.** The mentors' test0 (961 images) was split 50/50 per class. One half is
+- **External data split in two.** The external test0 (961 images) was split 50/50 per class. One half is
   the new final test; the other half went 80/20 to train / validation.
 - **Near duplicates stay together.** Images with a perceptual-hash (pHash) distance <= 5 were always
   put on the same side, and a test0 image that looks like one of our own images was never put in the
   test half.
 - **Our old frozen Test (400 images)** was moved into train; it is no longer a test set.
-- **The mentors' other scenarios** (test2, test3, test4) were kept only with images of the test half,
+- **The other external scenarios** (test2, test3, test4) were kept only with images of the test half,
   so none of them was seen in training.
 
 | Split | Images | Content |
 |---|---:|---|
-| train | 3418 | our train 2630 + our old Test 400 + mentor 388 |
-| validation | 755 | our validation 659 + mentor 96 |
-| Neysan (detector only) | 701 | our 624 + mentor 77 |
-| test0 | 479 | held-out half of the mentors' test0 |
-| test2 / test3 / test4 | 557 / 537 / 556 | the same 479 images in the mentors' other scenarios, plus Neysan images |
+| train | 3418 | our train 2630 + our old Test 400 + external 388 |
+| validation | 755 | our validation 659 + external 96 |
+| Neysan (detector only) | 701 | our 624 + external 77 |
+| test0 | 479 | held-out half of the external test0 |
+| test2 / test3 / test4 | 557 / 537 / 556 | the same 479 images in the other external scenarios, plus Neysan images |
 
 What the test scenarios contain (measured by SHA256 against test0):
 
@@ -69,10 +69,10 @@ epochs 1-5, best epoch by validation macro F1. Only train and validation are rea
 Validation loss is lowest around epoch 10 and rises slightly afterwards while F1 stays flat, a mild
 sign of overfitting.
 
-## 3. `kamyun` / `kamyunet` relabeling (mentor rule)
+## 3. `kamyun` / `kamyunet` relabeling (external labeling rule)
 
 The remaining validation errors were mostly `kamyun` <-> `kamyunet`. A review showed that our own data
-labeled light cab-over trucks inconsistently, while the mentors' data follows one rule:
+labeled light cab-over trucks inconsistently, while the external data follows one rule:
 
 - **`kamyunet`:** light cab-over trucks such as Isuzu, JAC, Hyundai and Foton.
 - **`kamyun`:** heavy trucks such as Scania, Volvo FH, heavy or bonneted Mercedes-Benz, FAW, dump
@@ -129,7 +129,7 @@ detector and threshold 0.95) was run once on the same folders. The test was not 
 | all (2129) | - | 0.8516 | 0.8618 |
 
 An `unknown` output counts as wrong, so every rejected Neysan in a class folder lowers accuracy in
-test2-test4; this is intended by the mentors' rule.
+test2-test4; this is intended by the labeling rule.
 
 ![test0 confusion matrix](../../docs/figures/test0_confusion_matrix.png)
 
@@ -150,14 +150,14 @@ Split by image type:
 
 ## Conclusion and limits
 
-`v3_final` is the new final model. It improves the clean mentor test from 0.9478 to 0.9666 (macro F1
+`v3_final` is the new final model. It improves the clean external test from 0.9478 to 0.9666 (macro F1
 0.9361 -> 0.9720), never rejects an ordinary test image, and needs fewer human reviews.
 
-- **Target not reached:** the goal of 0.98-0.99 on the mentor test was not reached; most remaining
+- **Target not reached:** the goal of 0.98-0.99 on the external test was not reached; most remaining
   errors are `kamyun` / `kamyunet`.
 - **Neysan:** the v3 detector rejects 98.5% of our held-out Neysan images, but only 87.3% of the
-  Neysan images in the mentors' scenarios (the earlier detector: 90.1%).
+  Neysan images in the external scenarios (the earlier detector: 90.1%).
 - **Single run:** one seed per setting; the differences between the best runs are a few validation
   images, and validation was used both for selection and for the threshold.
-- **Training data from the mentors:** half of test0 is in train / validation, so test0 measures images
+- **Training data from the external set:** half of test0 is in train / validation, so test0 measures images
   of the same source and style, not a completely new camera.

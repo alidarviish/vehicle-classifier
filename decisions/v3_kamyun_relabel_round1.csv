@@ -18,7 +18,7 @@ A16,train,train/kamyun/v2_train_kamyun_216008162.jpg,train/kamyunet/v2_train_kam
 A17,train,train/kamyun/v2_unclean_kamyun_194280486.jpg,train/kamyunet/v2_unclean_kamyun_194280486.jpg,kamyun,kamyunet
 A18,train,train/kamyun/v2_train_kamyun_215635130.jpg,train/kamyunet/v2_train_kamyun_215635130.jpg,kamyun,kamyunet
 A19,val,val/kamyun/v2_unclean_kamyun_218642439.jpg,val/kamyunet/v2_unclean_kamyun_218642439.jpg,kamyun,kamyunet
-A20,train,train/kamyun/mentor_200106068.jpg,train/kamyunet/mentor_200106068.jpg,kamyun,kamyunet
+A20,train,train/kamyun/external_200106068.jpg,train/kamyunet/external_200106068.jpg,kamyun,kamyunet
 A21,train,train/kamyun/v2_train_kamyun_216026504.jpg,train/kamyunet/v2_train_kamyun_216026504.jpg,kamyun,kamyunet
 A22,train,train/kamyun/v2_unclean_kamyun_219062079.jpg,train/kamyunet/v2_unclean_kamyun_219062079.jpg,kamyun,kamyunet
 A23,train,train/kamyun/v2_train_kamyun_219002808.jpg,train/kamyunet/v2_train_kamyun_219002808.jpg,kamyun,kamyunet
@@ -38,5 +38,5 @@ A39,train,train/kamyun/v2_train_kamyun_218906168.jpg,train/kamyunet/v2_train_kam
 A40,train,train/kamyun/v1_unclean_kamyun_218755560.jpg,train/kamyunet/v1_unclean_kamyun_218755560.jpg,kamyun,kamyunet
 A41,val,val/kamyun/v2_train_kamyun_219095831.jpg,val/kamyunet/v2_train_kamyun_219095831.jpg,kamyun,kamyunet
 A43,train,train/kamyun/v2_train_kamyun_216293604.jpg,train/kamyunet/v2_train_kamyun_216293604.jpg,kamyun,kamyunet
-B1,val,val/kamyunet/mentor_212358240.jpg,val/kamyun/mentor_212358240.jpg,kamyunet,kamyun
-B24,train,train/kamyunet/mentor_197014509.jpg,train/kamyun/mentor_197014509.jpg,kamyunet,kamyun
+B1,val,val/kamyunet/external_212358240.jpg,val/kamyun/external_212358240.jpg,kamyunet,kamyun
+B24,train,train/kamyunet/external_197014509.jpg,train/kamyun/external_197014509.jpg,kamyunet,kamyun

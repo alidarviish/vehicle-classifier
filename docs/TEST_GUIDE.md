@@ -56,7 +56,7 @@ TEST/
 python run_test.py --input path/to/TEST --output results_test
 ```
 
-On Windows, put paths with spaces in quotes: `--input "D:\mentor data\TEST"`.
+On Windows, put paths with spaces in quotes: `--input "D:\my data\TEST"`.
 
 | Option | Meaning |
 |---|---|

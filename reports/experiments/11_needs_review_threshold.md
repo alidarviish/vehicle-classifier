@@ -89,7 +89,7 @@ reproduced in this report.
   `10_final_model_selection.md`.
 - **Why.** Re-saving the checkpoint only to add this metadata would create a different checkpoint
   file with a different hash, without changing the learned weights.
-- **Status.** This is an intentional protocol decision, not a pending task. The assignment asks for
+- **Status.** This is an intentional protocol decision, not a pending task. The project specification asks for
   the selected threshold in the checkpoint metadata; this project keeps it in `src/predict.py`
   instead, next to the frozen checkpoint it is used with.
 

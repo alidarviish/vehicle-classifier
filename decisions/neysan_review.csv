@@ -15,7 +15,7 @@ A013,v1/train/vanet/207379908.jpg,f763dc5d5723440033bedbcf358b9b50b9e8f51fa78c60
 A014,v1/train/vanet/208328663.jpg,62c1f3b1f225aa6b5297130e078114bd5fb9695bbacd5def286096f4a1ee352d,CONFIRMED_NEYSAN,manual visual review,human,2026-09-27
 A015,v1/train/vanet/214572271.jpg,1aed90ed7f2e02b95a086c90292623ce03177ea985447f25aeaa373e8b81302f,CONFIRMED_NEYSAN,manual visual review,human,2026-09-27
 A016,v1/train/vanet/214596732.jpg,1ed7832e648c8cee63b501c47d9e19ceb4427e1da60f0dd89849e1d2336f4f7c,CONFIRMED_NEYSAN,manual visual review,human,2026-09-27
-A017,v1/train/vanet/214726285.jpg,3c3e5367ca5367ee04f5f2ea83d5112a68ff62258dc96c227508a35128c54507,NOT_NEYSAN,Modern Nissan pickup (Navara-style); not Neysan per professor clarification,rule:professor_clarification,2026-09-27
+A017,v1/train/vanet/214726285.jpg,3c3e5367ca5367ee04f5f2ea83d5112a68ff62258dc96c227508a35128c54507,NOT_NEYSAN,Modern Nissan pickup (Navara-style); not Neysan per project owner clarification,rule:owner_clarification,2026-09-27
 A018,v1/train/vanet/214844236.jpg,90916da4f0a7a65ea4c298d2a309b66d426e4a70867c5f3a5258f180c6b7f382,CONFIRMED_NEYSAN,Exact duplicate (same sha256) of v1/unclean/neysan/214844236.jpg,rule:exact_duplicate,2026-09-27
 A019,v1/train/vanet/215738096.jpg,3102b3375f665428cfd5bddb3b63258d0035d71b314ac6f79c6e652cf702a442,NOT_NEYSAN,manual visual review,human,2026-09-27
 A020,v1/train/vanet/216034128.jpg,5ff367829974f118743505fa63bc6ea1873a87776708f73065e73a1077418f95,CONFIRMED_NEYSAN,manual visual review,human,2026-09-27

@@ -20,7 +20,7 @@ Images are never copied into this repository. The reviewer looks at the
 contact sheets (generated outside the repository, never committed) or opens
 the raw image directly. The red label under each thumbnail is the `review_id`.
 
-## Taxonomy (confirmed by the professor)
+## Taxonomy (confirmed by the project owner)
 
 The model has 8 classes. Neysan is not a training class; it is a subtype of `vanet`
 used only for a separate evaluation after the model is frozen.
@@ -73,7 +73,7 @@ Leave `decision` empty for rows not reviewed yet.
 
 | review_id | decision | reason |
 |---|---|---|
-| A017 | `NOT_NEYSAN` | Modern Nissan pickup (Navara-style); professor clarification |
+| A017 | `NOT_NEYSAN` | Modern Nissan pickup (Navara-style); project owner clarification |
 | A018 | `CONFIRMED_NEYSAN` | Exact duplicate (same sha256) of an image in the Neysan folder |
 
 These rows have `reviewer` starting with `rule:` and need no review.

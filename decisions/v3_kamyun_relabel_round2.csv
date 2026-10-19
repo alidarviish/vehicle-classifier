@@ -13,7 +13,7 @@ C25,train,train/kamyun/v2_unclean_kamyun_218685223.jpg,train/kamyunet/v2_unclean
 C27,train,train/kamyun/v2_unclean_kamyun_217031763.jpg,train/kamyunet/v2_unclean_kamyun_217031763.jpg,kamyun,kamyunet
 C29,train,train/kamyun/v2_train_kamyun_200170189.jpg,train/kamyunet/v2_train_kamyun_200170189.jpg,kamyun,kamyunet
 C30,train,train/kamyun/v2_train_kamyun_216977256.jpg,train/kamyunet/v2_train_kamyun_216977256.jpg,kamyun,kamyunet
-C31,train,train/kamyun/mentor_212197830.jpg,train/kamyunet/mentor_212197830.jpg,kamyun,kamyunet
+C31,train,train/kamyun/external_212197830.jpg,train/kamyunet/external_212197830.jpg,kamyun,kamyunet
 C33,train,train/kamyun/v1_unclean_kamyun_209859136.jpg,train/kamyunet/v1_unclean_kamyun_209859136.jpg,kamyun,kamyunet
 C34,train,train/kamyun/old_test_215619169.jpg,train/kamyunet/old_test_215619169.jpg,kamyun,kamyunet
 C35,train,train/kamyun/old_test_216852176.jpg,train/kamyunet/old_test_216852176.jpg,kamyun,kamyunet

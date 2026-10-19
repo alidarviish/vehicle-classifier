@@ -29,9 +29,9 @@ model is `v3_final`; see the [README](../README.md) and
 7. **Neysan evaluation.** A separate, inference-only analysis of 621 Neysan images (an unseen subtype
    of `vanet`, not a class), run once for `resnet224_ft_aug` and once for `swin_t_ft_aug`.
 8. **Test runner and Neysan rejection.** `run_test.py` tests the final model on any folder of new
-   images (the mentors' test). A small Neysan detector on the model's features reports a Neysan as
+   images (the external test). A small Neysan detector on the model's features reports a Neysan as
    `unknown` instead of `vanet`; the 8-class model is unchanged
-   ([details](NEYSAN_REJECTION.md), [guide](MENTOR_TEST_GUIDE.md)).
+   ([details](NEYSAN_REJECTION.md), [guide](TEST_GUIDE.md)).
 
 ## Setup
 
@@ -72,7 +72,7 @@ The data scripts only read the raw images.
 | Neysan evaluation (done once, historical `resnet224_ft_aug`) | `python scripts/archive/evaluate_neysan.py` |
 | Neysan evaluation (done once, final model `swin_t_ft_aug`) | `python scripts/archive/evaluate_neysan_swin.py --visibility-tags <tags.csv> --val-baseline <val_predictions.csv>` |
 | Prediction (JSON) | `python -m src.predict path/to/image.jpg [more images]` |
-| Test the final model on a folder of new images (mentor test) | `python run_test.py --input <folder>`, see [docs/MENTOR_TEST_GUIDE.md](MENTOR_TEST_GUIDE.md) |
+| Test the final model on a folder of new images (external test) | `python run_test.py --input <folder>`, see [docs/TEST_GUIDE.md](TEST_GUIDE.md) |
 | Build the Neysan detector (re-run; writes a new file) | `python scripts/archive/build_neysan_detector.py` |
 
 Notes on the commands:
@@ -163,11 +163,11 @@ Selected after the project was reopened; see
 
 ### Neysan -> `unknown` in the test runner (added 2026-10-08)
 
-The mentors' test rule is that a Neysan must not be accepted as a `vanet`. The 8-class model is
+The test rule is that a Neysan must not be accepted as a `vanet`. The 8-class model is
 unchanged; `run_test.py` adds one step on top of it:
 
 - **Detector:** a logistic regression on the 768-number feature vector of the frozen model
-  (`checkpoints/neysan_detector.json`, not in Git, delivered with the model file).
+  (`checkpoints/neysan_detector.json`, not in Git, shipped with the model file).
 - **Training data:** the 2633 training images and 259 of the 371 confirmed Neysan images. The 8-class
   model was not retrained, and no image of the frozen Test set was used.
 - **Rule:** if p(Neysan) >= 0.5 (fixed in advance, not tuned), the output is `unknown` instead of one
@@ -198,10 +198,10 @@ model does not identify Neysan as a distinct subtype. However, confirmed Neysan 
 human-review rate than ordinary validation `vanet` images (30.0% vs 15.4%). Among confirmed Neysan cases
 that were not predicted as `vanet`, most were flagged for human review. This supports `needs_review` as a
 robustness and human-review mechanism, but does not establish Neysan detection or guarantee detection of
-Neysan in the mentor-held Test set.
+Neysan in the external held-out test set.
 
 The evaluation does not estimate Neysan prevalence in a mixed stream, and does not establish
-calibration, generalisation to other conditions or performance on the mentor-held Test set.
+calibration, generalisation to other conditions or performance on the external held-out test set.
 
 ### Previous final model `resnet224_ft_aug` (historical, threshold 0.90)
 
@@ -254,7 +254,7 @@ Run after the original final model was fixed. The EfficientNet-B0 comparison did
 - [Inference-time and kamyun / kamyunet boundary audits (diagnostic only)](../reports/experiments/26_inference_audits.md)
 - [Dataset decisions](DATA_DECISIONS.md)
 - [Neysan -> `unknown` (Neysan detector)](NEYSAN_REJECTION.md)
-- [Mentor test guide (`run_test.py`)](MENTOR_TEST_GUIDE.md)
+- [Test guide (`run_test.py`)](TEST_GUIDE.md)
 
 ## Reproducibility
 
@@ -302,10 +302,10 @@ Added 2026-10-08. The 8-class model is unchanged; this is one extra step in the 
 
 ### Why
 
-The mentors' test rule is that a Neysan pickup must **not** be treated as a `vanet`. The project's
+The test rule is that a Neysan pickup must **not** be treated as a `vanet`. The project's
 earlier taxonomy (`decisions/REVIEW_PROTOCOL.md`, `reports/experiments/25_swin_neysan_evaluation.md`)
 treated Neysan as a subtype of `vanet`, and the 8-class model predicts `vanet` for about 89% of
-Neysan images. To follow the mentors' rule without retraining, the runner reports such images as
+Neysan images. To follow the labeling rule without retraining, the runner reports such images as
 `unknown` instead of one of the 8 classes.
 
 ### How it works

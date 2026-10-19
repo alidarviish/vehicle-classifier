@@ -150,4 +150,4 @@ This decision:
 - does not itself run training, inference or Test.
 
 The ResNet18 transfer-learning work required by the project definition remains documented in
-full; this record only changes which model is delivered as final.
+full; this record only changes which model is used as final.

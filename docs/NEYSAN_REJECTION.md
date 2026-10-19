@@ -5,7 +5,7 @@ pickup is reported as `unknown` instead of `vanet`. The 8-class model itself is 
 
 ## Why
 
-The mentors' rule is that a Neysan (the common Iranian Nissan pickup) must **not** be accepted as a
+The labeling rule is that a Neysan (the common Iranian Nissan pickup) must **not** be accepted as a
 `vanet`. Neysan was never one of the 8 classes; without this step the model predicts `vanet` for most
 Neysan images.
 
@@ -32,7 +32,7 @@ The script never reads the test folders. The acceptance rules were written down 
 
 - **Negatives:** the 3418 training images of dataset v3 (all 8 classes).
 - **Positives:** trusted Neysan images (confirmed Neysan from our `vanet` folders and Neysan images from
-  the mentors' data), split by SHA256 with seed 42 into train / calibration / holdout = 70 / 15 / 15%
+  the external data), split by SHA256 with seed 42 into train / calibration / holdout = 70 / 15 / 15%
   (315 / 68 / 68).
 - **Extra check only:** the N1 images (Neysan by folder name, never reviewed one by one).
 - **Model:** `StandardScaler` + `LogisticRegression(C=1.0, class_weight="balanced")`.
@@ -48,7 +48,7 @@ The script never reads the test folders. The acceptance rules were written down 
 | 8-class validation correct after rejection | 742 / 755 (was 744) | - |
 | **Decision** | **PASS** | |
 
-On the mentors' test scenarios ([report 27](../reports/experiments/27_v3_dataset_and_final_model.md)):
+On the external test scenarios ([report 27](../reports/experiments/27_v3_dataset_and_final_model.md)):
 186 of 213 Neysan images (0.873) were rejected, and no ordinary test image was reported as `unknown`.
 
 ## How it shows in the results
@@ -61,8 +61,8 @@ On the mentors' test scenarios ([report 27](../reports/experiments/27_v3_dataset
 
 ## Limits
 
-- About 13% of the Neysan images in the mentors' scenarios were not rejected, against 1.5% of our own
-  held-out Neysan images: the mentors' Neysan images are harder for the detector.
+- About 13% of the Neysan images in the external scenarios were not rejected, against 1.5% of our own
+  held-out Neysan images: the external Neysan images are harder for the detector.
 - On ordinary images, about 2 in 755 validation images were rejected by mistake.
 - GPU and CPU can differ in the last decimals, so an image with a score extremely close to 0.5 can
   differ between machines.

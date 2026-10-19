@@ -24,7 +24,7 @@ this project.
   saved by the same criterion.
 - **Supporting criteria:** accuracy, macro precision and macro recall.
 - **Per-class behaviour:** checked as well, in particular vanet and kamyun / kamyunet.
-- **Final model:** a CrossEntropy (softmax) model, as the assignment requires for the prediction
+- **Final model:** a CrossEntropy (softmax) model, as the project specification requires for the prediction
   output. All six candidates use CrossEntropyLoss.
 
 No model or data was changed for this selection. It uses only the existing checkpoints, histories

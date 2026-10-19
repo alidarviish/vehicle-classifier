@@ -19,8 +19,8 @@ IMAGE_TYPES = {".jpg", ".jpeg", ".png", ".bmp"}
 
 
 def origin(name):
-    if name.startswith("mentor_"):
-        return "mentor"
+    if name.startswith("external_"):
+        return "external"
     if name.startswith("old_test_"):
         return "ours_old_test"
     return "ours"
@@ -39,7 +39,7 @@ def main():
         elif parts[0] == "neysan":
             split, label = "neysan", "neysan"
         elif parts[0] == "test":
-            split, label = "test_" + parts[1], parts[2]     # e.g. test_test0, folder = mentor label
+            split, label = "test_" + parts[1], parts[2]     # e.g. test_test0, folder = external label
         else:
             continue                                         # review/ and anything else
         rows.append({"path": "/".join(parts), "sha256": hashlib.sha256(p.read_bytes()).hexdigest(),
